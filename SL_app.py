@@ -488,10 +488,6 @@ def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, l
     # Filter for the specific week - FIXED: Use lowercase 'week'
     week_matchups = matchups_df[matchups_df['week'] == week] if 'week' in matchups_df.columns else pd.DataFrame()
     
-    if not week_matchups.empty:
-        st.write(f"DEBUG - Week matchups data:")
-        st.dataframe(week_matchups)
-    
     if week_matchups.empty:
         st.info(f"No {league} line league matchups found for week {week}")
         return
@@ -510,12 +506,6 @@ def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, l
             (all_teams['team_name'] == team2_manager) & 
             (all_teams['league'] == league)
         ]
-        
-        st.write(f"DEBUG - team1 found: {not team1.empty}, team2 found: {not team2.empty}")
-        if not team1.empty:
-            st.write(f"DEBUG - team1_id: {team1.iloc[0]['team_id']}")
-        if not team2.empty:
-            st.write(f"DEBUG - team2_id: {team2.iloc[0]['team_id']}")
         
         if team1.empty or team2.empty:
             continue
