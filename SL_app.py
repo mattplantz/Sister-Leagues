@@ -418,16 +418,22 @@ def refresh_data(sheets_manager, brown_api, red_api, week):
     """Refresh data from both leagues"""
     with st.spinner("Refreshing data..."):
         try:
-            # Get teams from both leagues
-            brown_teams = brown_api.get_teams()
-            try:
-                red_teams = red_api.get_teams()
-                all_teams = pd.concat([brown_teams, red_teams], ignore_index=True)
-            except:
-                all_teams = brown_teams
-                st.warning("Red League data not available")
+            # DON'T refresh team data - preserve manual Google Sheets data
+            all_teams = sheets_manager.get_worksheet_data("teams")
             
-            sheets_manager.update_worksheet("teams", all_teams)
+            if all_teams.empty:
+                # Only get teams from ESPN if no manual data exists
+                brown_teams = brown_api.get_teams()
+                try:
+                    red_teams = red_api.get_teams()
+                    all_teams = pd.concat([brown_teams, red_teams], ignore_index=True)
+                except:
+                    all_teams = brown_teams
+                    st.warning("Red League data not available")
+                sheets_manager.update_worksheet("teams", all_teams)
+                st.info("Created initial team data from ESPN")
+            else:
+                st.info("Using existing team data from Google Sheets")
             
             # Calculate comprehensive scores
             calculator = ScoreCalculator(all_teams, brown_api, red_api, sheets_manager)
@@ -668,4 +674,3 @@ def show_records(all_teams, sheets_manager):
 
 if __name__ == "__main__":
     main()
-
