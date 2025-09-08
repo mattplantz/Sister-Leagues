@@ -88,42 +88,6 @@ class ESPNFantasyAPI:
         else:
             raise Exception(f"ESPN API Error for {self.league_type}: {response.status_code}")
     
-    def get_teams_debug_info(self):
-        """Get raw team data for debugging - helps identify correct IDs and manager names"""
-        try:
-            data = self.make_request("mTeam")
-            teams_info = []
-            
-            for team in data.get('teams', []):
-                team_info = {
-                    'team_id': team['id'],
-                    'location': team.get('location', ''),
-                    'nickname': team.get('nickname', ''),
-                    'owner_id': team.get('primaryOwner', 'Unknown'),
-                    'raw_team_data': team  # Include raw data for debugging
-                }
-                
-                # Try to get owner info from members
-                members = data.get('members', [])
-                for member in members:
-                    if member.get('id') == team.get('primaryOwner'):
-                        team_info['owner_display_name'] = member.get('displayName', 'Unknown')
-                        team_info['owner_first_name'] = member.get('firstName', '')
-                        team_info['owner_last_name'] = member.get('lastName', '')
-                        break
-                else:
-                    team_info['owner_display_name'] = 'Unknown'
-                    team_info['owner_first_name'] = ''
-                    team_info['owner_last_name'] = ''
-                
-                teams_info.append(team_info)
-            
-            return teams_info
-            
-        except Exception as e:
-            st.error(f"Error getting debug info for {self.league_type}: {e}")
-            return []
-    
     def get_teams(self):
         """Get team information"""
         data = self.make_request("mTeam")
@@ -262,19 +226,9 @@ class ScoreCalculator:
         brown_scores = self.brown_api.get_live_scores(week)
         red_scores = self.red_api.get_live_scores(week)
         
-        # Debug: Print what we got from live scores
-        print(f"DEBUG: Brown scores keys: {list(brown_scores.keys())}")
-        print(f"DEBUG: Red scores keys: {list(red_scores.keys())}")
-        
         # Get intra-league matchups (these should return prefixed IDs)
         brown_matchups = self.brown_api.get_matchups(week)
         red_matchups = self.red_api.get_matchups(week)
-        
-        # Debug: Print matchup IDs
-        if not brown_matchups.empty:
-            print(f"DEBUG: Brown matchup IDs: {brown_matchups[['away_team_id', 'home_team_id']].values}")
-        if not red_matchups.empty:
-            print(f"DEBUG: Red matchup IDs: {red_matchups[['away_team_id', 'home_team_id']].values}")
         
         # Get cross-league matchups from Google Sheets
         cross_matchups = self.sheets_manager.get_worksheet_data("matchups")
@@ -285,14 +239,12 @@ class ScoreCalculator:
         
         # Combine all scores (both should use prefixed IDs now)
         all_scores = {**brown_scores, **red_scores}
-        print(f"DEBUG: Combined scores keys: {list(all_scores.keys())}")
         
         # Calculate top 6 teams across both leagues (using prefixed IDs)
         top6_teams = []
         if week_complete:
             sorted_scores = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
             top6_teams = [prefixed_team_id for prefixed_team_id, score in sorted_scores[:6]]
-            print(f"DEBUG: Top 6 teams: {top6_teams}")
         
         # Process each league
         weekly_data = []
@@ -302,7 +254,6 @@ class ScoreCalculator:
             brown_scores, brown_matchups, week_cross_matchups, 
             'brown', week, week_complete, top6_teams
         )
-        print(f"DEBUG: Brown data team IDs: {[item['team_id'] for item in brown_data]}")
         weekly_data.extend(brown_data)
         
         # Process Red League  
@@ -310,11 +261,9 @@ class ScoreCalculator:
             red_scores, red_matchups, week_cross_matchups, 
             'red', week, week_complete, top6_teams
         )
-        print(f"DEBUG: Red data team IDs: {[item['team_id'] for item in red_data]}")
         weekly_data.extend(red_data)
         
         result_df = pd.DataFrame(weekly_data)
-        print(f"DEBUG: Final dataframe team IDs: {list(result_df['team_id'].values) if not result_df.empty else 'Empty'}")
         
         return result_df
     
@@ -433,21 +382,14 @@ def main():
         index=current_week-1
     )
     
-    # Debug mode toggle - FIXED: Now properly defined
-    debug_mode = st.sidebar.checkbox("Show Debug Info", value=False)
-    
     # Manual refresh button
     if st.sidebar.button("🔄 Refresh Data", type="primary"):
         refresh_data(sheets_manager, brown_api, red_api, selected_week)
     
-    # Debug: Add Red League team debug button
-    if st.sidebar.button("🔍 Debug Red League Teams", help="Show raw Red League team data to help with ID mapping"):
-        debug_red_league_teams(red_api)
-    
-    # Page selector - UPDATED: Added Weekly Matchups
+    # Page selector - UPDATED: Removed Live Scores and Weekly Rankings
     page = st.sidebar.selectbox(
         "Select View", 
-        ["Live Scores", "Weekly Matchups", "Weekly Rankings", "Season Standings", "Records"]
+        ["Weekly Matchups", "Season Standings", "Records"]
     )
     
     # Load teams data for both leagues - ALWAYS use Google Sheets
@@ -457,68 +399,17 @@ def main():
         st.error("No team data found in Google Sheets. Please check the 'teams' tab.")
         return
     
-    # Debug: Force refresh teams button
-    if st.sidebar.button("🔄 Force Reload Teams from Sheets", key="force_reload_teams"):
-        st.cache_data.clear()
-        all_teams = sheets_manager.get_worksheet_data("teams")
-        st.success("Teams reloaded from Google Sheets!")
-    
     if all_teams.empty:
         st.error("Unable to load team data")
         return
     
     # Render selected page
-    if page == "Live Scores":
-        show_live_scores(all_teams, brown_api, red_api, sheets_manager, selected_week, debug_mode)
-    elif page == "Weekly Matchups":
+    if page == "Weekly Matchups":
         show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, selected_week)
-    elif page == "Weekly Rankings":
-        show_weekly_rankings(all_teams, brown_api, red_api, selected_week)
     elif page == "Season Standings":
         show_season_standings(all_teams, sheets_manager)
     elif page == "Records":
         show_records(all_teams, sheets_manager)
-
-def debug_red_league_teams(red_api):
-    """Debug function to show raw Red League team data"""
-    st.subheader("🔍 Red League Team Debug Info")
-    
-    try:
-        teams_debug = red_api.get_teams_debug_info()
-        
-        if teams_debug:
-            st.success("✅ Successfully connected to Red League!")
-            
-            for team_info in teams_debug:
-                with st.expander(f"Team ID {team_info['team_id']} - {team_info['location']} {team_info['nickname']}"):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.write("**Team Info:**")
-                        st.write(f"ID: {team_info['team_id']}")
-                        st.write(f"Location: {team_info['location']}")
-                        st.write(f"Nickname: {team_info['nickname']}")
-                        st.write(f"Owner ID: {team_info['owner_id']}")
-                    
-                    with col2:
-                        st.write("**Manager Info:**")
-                        st.write(f"Display Name: {team_info['owner_display_name']}")
-                        st.write(f"First Name: {team_info['owner_first_name']}")
-                        st.write(f"Last Name: {team_info['owner_last_name']}")
-                        
-                        # Suggested mapping
-                        full_name = f"{team_info['owner_first_name']} {team_info['owner_last_name']}".strip()
-                        if full_name:
-                            st.write(f"**Suggested mapping: {team_info['team_id']}: '{full_name}'**")
-            
-            st.info("💡 Use the suggested mappings above to update the manager_mapping in the get_teams() method for the red league.")
-            
-        else:
-            st.error("❌ No team data found. Check your Red League credentials.")
-            
-    except Exception as e:
-        st.error(f"❌ Error connecting to Red League: {e}")
-        st.info("This usually means your red_swid and red_espn_s2 credentials are missing or incorrect.")
 
 def refresh_data(sheets_manager, brown_api, red_api, week):
     """Refresh data from both leagues"""
@@ -535,7 +426,7 @@ def refresh_data(sheets_manager, brown_api, red_api, week):
                     all_teams = pd.concat([brown_teams, red_teams], ignore_index=True)
                 except:
                     all_teams = brown_teams
-                    st.warning("Red League data not available")
+                    st.warning("Red Line League data not available")
                 sheets_manager.update_worksheet("teams", all_teams)
                 st.info("Created initial team data from ESPN")
             else:
@@ -558,26 +449,8 @@ def refresh_data(sheets_manager, brown_api, red_api, week):
         except Exception as e:
             st.error(f"Error refreshing data: {e}")
 
-def force_refresh_teams(sheets_manager, brown_api, red_api):
-    """Force refresh team data from ESPN (will overwrite manual changes)"""
-    with st.spinner("Force refreshing team data..."):
-        try:
-            brown_teams = brown_api.get_teams()
-            try:
-                red_teams = red_api.get_teams()
-                all_teams = pd.concat([brown_teams, red_teams], ignore_index=True)
-            except:
-                all_teams = brown_teams
-                st.warning("Red League data not available")
-            
-            sheets_manager.update_worksheet("teams", all_teams)
-            st.success("Team data forcefully refreshed from ESPN!")
-            st.warning("Your manual team changes have been overwritten")
-        except Exception as e:
-            st.error(f"Error force refreshing teams: {e}")
-
 def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
-    """Show weekly matchups for all leagues"""
+    """Show weekly matchups for all leagues - UPDATED: Stacked vertically in specified order"""
     st.header(f"Week {week} Matchups")
     
     # Get current scores for display
@@ -593,29 +466,25 @@ def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
     cross_matchups = sheets_manager.get_worksheet_data("matchups")
     week_cross_matchups = cross_matchups[cross_matchups['week'] == week] if not cross_matchups.empty else pd.DataFrame()
     
-    # Create four sections
-    col1, col2 = st.columns(2)
+    # UPDATED: Stack sections vertically in specified order
+    st.subheader("🔴 Red Line League Matchups")
+    display_intra_league_matchups(red_matchups, all_teams, all_scores, week, 'red')
     
-    with col1:
-        st.subheader("🤎 Brown League Matchups")
-        display_intra_league_matchups(brown_matchups, all_teams, all_scores, week, 'brown')
-        
-        st.subheader("🔴 Red League Matchups")
-        display_intra_league_matchups(red_matchups, all_teams, all_scores, week, 'red')
+    st.subheader("🤎 Brown Line League Matchups")
+    display_intra_league_matchups(brown_matchups, all_teams, all_scores, week, 'brown')
     
-    with col2:
-        st.subheader("⚔️ Cross-League Matchups")
-        display_cross_league_matchups(week_cross_matchups, all_teams, all_scores)
-        
-        st.subheader("🏆 All Teams Leaderboard")
-        display_all_teams_leaderboard(all_teams, all_scores)
+    st.subheader("⚔️ Cross-League Matchups")
+    display_cross_league_matchups(week_cross_matchups, all_teams, all_scores)
+    
+    st.subheader("🏆 Top 6 Scoreboard")  # UPDATED: Changed title from "All Teams Leaderboard"
+    display_all_teams_leaderboard(all_teams, all_scores)
 
 def display_intra_league_matchups(matchups, all_teams, all_scores, week, league):
     """Display intra-league matchups"""
     week_matchups = matchups[matchups['week'] == week] if not matchups.empty else pd.DataFrame()
     
     if week_matchups.empty:
-        st.info(f"No {league} league matchups found for week {week}")
+        st.info(f"No {league} line league matchups found for week {week}")  # UPDATED: Added "line"
         return
     
     for _, matchup in week_matchups.iterrows():
@@ -738,131 +607,6 @@ def display_all_teams_leaderboard(all_teams, all_scores):
         with col3:
             st.metric("", f"{team['score']:.1f}")
 
-def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week, debug_mode):
-    """Show live scores for both leagues"""
-    st.header(f"Week {week} Live Scores")
-    
-    calculator = ScoreCalculator(all_teams, brown_api, red_api, sheets_manager)
-    weekly_data = calculator.calculate_weekly_scores(week)
-    
-    if weekly_data.empty:
-        st.warning(f"No data available for Week {week}")
-        return
-    
-    week_complete = weekly_data.iloc[0]['week_complete'] if not weekly_data.empty else False
-    
-    if week_complete:
-        st.success("Week Complete - Points Awarded")
-    else:
-        st.info("Live Scoring - Points will be awarded Tuesday morning")
-    
-    # Show league sections
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("🤎 Brown Line League")
-        brown_data = weekly_data[weekly_data['league'] == 'brown']
-        display_league_scores(brown_data, all_teams, week_complete, debug_mode)
-    
-    with col2:
-        st.subheader("🔴 Red Line League")
-        red_data = weekly_data[weekly_data['league'] == 'red']
-        if not red_data.empty:
-            display_league_scores(red_data, all_teams, week_complete, debug_mode)
-        else:
-            st.info("Red Line League data not available yet")
-
-def display_league_scores(league_data, all_teams, week_complete, debug_mode):
-    """Display scores for one league"""
-    for _, row in league_data.iterrows():
-        team_id = row['team_id']
-        
-        # Debug: Show what we're trying to match
-        if debug_mode:
-            st.write(f"Looking for team_id: {team_id} (type: {type(team_id)})")
-            st.write(f"Available team_ids in sheets: {list(all_teams['team_id'].values)} (types: {[type(x) for x in all_teams['team_id'].values[:3]]})")
-        
-        # Find team name with error handling - try both exact match and string conversion
-        team_matches = all_teams[all_teams['team_id'] == team_id]['team_name']
-        
-        if team_matches.empty:
-            # Try converting team_id to string and match
-            team_matches = all_teams[all_teams['team_id'].astype(str) == str(team_id)]['team_name']
-        
-        if team_matches.empty:
-            # Try converting both to int and match
-            try:
-                team_matches = all_teams[all_teams['team_id'].astype(int) == int(team_id)]['team_name']
-            except:
-                pass
-        
-        if team_matches.empty:
-            team_name = f"Team {team_id} (Not Found)"
-        else:
-            team_name = team_matches.iloc[0]
-        
-        st.write(f"**{team_name}**")
-        st.write(f"Score: {row['actual_score']:.1f}")
-        
-        if week_complete:
-            record = f"{int(row['total_weekly_points'])}-{int(row['weekly_losses'])}"
-            st.write(f"Week Record: {record}")
-        
-        st.write("---")
-
-def show_weekly_rankings(all_teams, brown_api, red_api, week):
-    """Show combined weekly rankings"""
-    st.header(f"Week {week} Combined Rankings")
-    
-    brown_scores = brown_api.get_live_scores(week)
-    red_scores = red_api.get_live_scores(week) if red_api else {}
-    
-    # Combine and rank all scores
-    all_scores = []
-    for team_id, score in {**brown_scores, **red_scores}.items():
-        team_info = all_teams[all_teams['team_id'] == team_id]
-        if not team_info.empty:
-            all_scores.append({
-                'team_id': team_id,
-                'team_name': team_info.iloc[0]['team_name'],
-                'league': team_info.iloc[0]['league'],
-                'score': score
-            })
-        else:
-            # Handle missing team info - extract league from unique team_id format
-            league = team_id.split('_')[0] if '_' in str(team_id) else 'unknown'
-            all_scores.append({
-                'team_id': team_id,
-                'team_name': f'Team {team_id} (Not Found)',
-                'league': league,
-                'score': score
-            })
-    
-    if not all_scores:
-        st.warning("No scores available for this week")
-        return
-    
-    rankings_df = pd.DataFrame(all_scores)
-    rankings_df = rankings_df.sort_values('score', ascending=False).reset_index(drop=True)
-    rankings_df['rank'] = rankings_df.index + 1
-    
-    # Display rankings with top 6 indicator
-    for _, row in rankings_df.iterrows():
-        col1, col2, col3, col4 = st.columns([1, 1, 3, 2])
-        
-        with col1:
-            st.write(f"**#{row['rank']}**")
-        with col2:
-            if row['rank'] <= 6:
-                st.write("⭐")
-            else:
-                st.write("")
-        with col3:
-            league_emoji = "🤎" if row['league'] == 'brown' else "🔴"
-            st.write(f"{league_emoji} **{row['team_name']}**")
-        with col4:
-            st.metric("Score", f"{row['score']:.1f}")
-
 def show_season_standings(all_teams, sheets_manager):
     """Show season standings for both leagues"""
     st.header("Season Standings")
@@ -873,10 +617,23 @@ def show_season_standings(all_teams, sheets_manager):
         st.warning("No historical data available yet")
         return
     
-    # FIXED: Ensure 'league' column exists and handle data type issues
+    # FIXED: Handle the league column issue - ensure it exists in the data
     if 'league' not in weekly_scores_df.columns:
-        st.error("League column not found in weekly scores data")
-        return
+        # If no league column exists, try to infer it from team_id patterns
+        # Team IDs are formatted as: brown_1, brown_2, etc. and red_1, red_6, etc.
+        def infer_league(team_id):
+            try:
+                team_id_str = str(team_id).lower()
+                if team_id_str.startswith('brown_'):
+                    return 'brown'
+                elif team_id_str.startswith('red_'):
+                    return 'red'
+                else:
+                    return 'unknown'
+            except:
+                return 'unknown'
+        
+        weekly_scores_df['league'] = weekly_scores_df['team_id'].apply(infer_league)
     
     # Clean and standardize the league column
     weekly_scores_df['league'] = weekly_scores_df['league'].astype(str).str.strip().str.lower()
@@ -884,23 +641,23 @@ def show_season_standings(all_teams, sheets_manager):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("🤎 Brown League")
+        st.subheader("🤎 Brown Line League")  # UPDATED: Added "Line"
         display_league_standings(weekly_scores_df, all_teams, 'brown')
     
     with col2:
-        st.subheader("🔴 Red League") 
+        st.subheader("🔴 Red Line League")   # UPDATED: Added "Line"
         display_league_standings(weekly_scores_df, all_teams, 'red')
 
 def display_league_standings(weekly_scores_df, all_teams, league):
     """Display standings for one league"""
-    # FIXED: Use cleaned league column and handle potential data type mismatches
+    # Use cleaned league column and handle potential data type mismatches
     league_data = weekly_scores_df[weekly_scores_df['league'] == league]
     
     if league_data.empty:
-        st.info(f"No {league} league data available yet")
+        st.info(f"No {league} line league data available yet")  # UPDATED: Added "line"
         return
     
-    # FIXED: Ensure numeric columns are properly converted
+    # Ensure numeric columns are properly converted
     numeric_cols = ['total_weekly_points', 'weekly_losses', 'actual_score']
     for col in numeric_cols:
         if col in league_data.columns:
@@ -918,7 +675,7 @@ def display_league_standings(weekly_scores_df, all_teams, league):
         'actual_score': 'total_points'
     }, inplace=True)
     
-    # FIXED: Handle team_id matching more robustly
+    # Handle team_id matching more robustly
     standings['team_id'] = standings['team_id'].astype(str)
     all_teams_copy = all_teams.copy()
     all_teams_copy['team_id'] = all_teams_copy['team_id'].astype(str)
@@ -958,15 +715,23 @@ def show_records(all_teams, sheets_manager):
         st.warning("No historical data available yet")
         return
     
-    # FIXED: Ensure 'league' column exists and handle data type issues
+    # FIXED: Handle the league column issue - ensure it exists in the data
     if 'league' not in weekly_scores_df.columns:
-        st.error("League column not found in weekly scores data")
-        return
+        # If no league column exists, try to infer it from team_id patterns
+        # Brown league team IDs are typically 1-6, Red league are 101-106
+        def infer_league(team_id):
+            try:
+                tid = int(team_id)
+                return 'red' if tid > 100 else 'brown'
+            except:
+                return 'unknown'
+        
+        weekly_scores_df['league'] = weekly_scores_df['team_id'].apply(infer_league)
     
     # Clean and standardize the league column
     weekly_scores_df['league'] = weekly_scores_df['league'].astype(str).str.strip().str.lower()
     
-    # FIXED: Ensure numeric columns are properly converted
+    # Ensure numeric columns are properly converted
     numeric_cols = ['intra_league_points', 'cross_league_points', 'top6_points', 'total_weekly_points', 'weekly_losses']
     for col in numeric_cols:
         if col in weekly_scores_df.columns:
@@ -981,7 +746,7 @@ def show_records(all_teams, sheets_manager):
         'weekly_losses': 'sum'
     }).reset_index()
     
-    # FIXED: Handle team_id matching more robustly
+    # Handle team_id matching more robustly
     records['team_id'] = records['team_id'].astype(str)
     all_teams_copy = all_teams.copy()
     all_teams_copy['team_id'] = all_teams_copy['team_id'].astype(str)
