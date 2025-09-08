@@ -84,13 +84,26 @@ class ESPNFantasyAPI:
         """Get team information"""
         data = self.make_request("mTeam")
         
+        # Brown League team to manager mapping
+        manager_mapping = {
+            1: 'John Van Handel',
+            2: 'Andrew Lupario', 
+            3: 'Matt Plantz',
+            4: 'Josh Brechtel',
+            5: 'Michael McCormick',
+            6: 'Will Grant'
+        }
+        
         teams = []
         for team in data.get('teams', []):
+            team_id = team['id']
+            manager_name = manager_mapping.get(team_id, f"Team {team_id}")
+            
             teams.append({
-                'team_id': team['id'],
-                'team_name': f"{team.get('location', 'Team')} {team.get('nickname', str(team['id']))}",
+                'team_id': team_id,
+                'team_name': manager_name,  # Use manager name as display name
                 'location': team.get('location', 'Team'),
-                'nickname': team.get('nickname', str(team['id'])),
+                'nickname': team.get('nickname', str(team_id)),
                 'owner': team.get('primaryOwner', 'Unknown'),
                 'league': 'brown_line'
             })
