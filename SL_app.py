@@ -255,33 +255,30 @@ class ScoreCalculator:
         cross_opponents = {}
         if not cross_matchups.empty:
             for _, match in cross_matchups.iterrows():
-                if league == 'brown':
-                    brown_manager = match.get('brown_league_manager', '')
-                    red_manager = match.get('red_league_manager', '')
-                    # Find team IDs by manager name
-                    brown_team = self.all_teams_df[
-                        (self.all_teams_df['team_name'] == brown_manager) & 
-                        (self.all_teams_df['league'] == 'brown')
-                    ]
-                    red_team = self.all_teams_df[
-                        (self.all_teams_df['team_name'] == red_manager) & 
-                        (self.all_teams_df['league'] == 'red')
-                    ]
-                    if not brown_team.empty and not red_team.empty:
-                        cross_opponents[brown_team.iloc[0]['team_id']] = red_team.iloc[0]['team_id']
-                else:  # red league
-                    red_manager = match.get('red_league_manager', '')
-                    brown_manager = match.get('brown_league_manager', '')
-                    red_team = self.all_teams_df[
-                        (self.all_teams_df['team_name'] == red_manager) & 
-                        (self.all_teams_df['league'] == 'red')
-                    ]
-                    brown_team = self.all_teams_df[
-                        (self.all_teams_df['team_name'] == brown_manager) & 
-                        (self.all_teams_df['league'] == 'brown')
-                    ]
-                    if not red_team.empty and not brown_team.empty:
-                        cross_opponents[red_team.iloc[0]['team_id']] = brown_team.iloc[0]['team_id']
+                brown_manager = match.get('brown_league_manager', '')
+                red_manager = match.get('red_league_manager', '')
+                
+                # Find Brown League team by manager name
+                brown_team = self.all_teams_df[
+                    (self.all_teams_df['team_name'] == brown_manager) & 
+                    (self.all_teams_df['league'] == 'brown')
+                ]
+                
+                # Find Red League team by manager name
+                red_team = self.all_teams_df[
+                    (self.all_teams_df['team_name'] == red_manager) & 
+                    (self.all_teams_df['league'] == 'red')
+                ]
+                
+                # Map the cross-league opponents correctly
+                if not brown_team.empty and not red_team.empty:
+                    brown_team_id = brown_team.iloc[0]['team_id']
+                    red_team_id = red_team.iloc[0]['team_id']
+                    
+                    if league == 'brown':
+                        cross_opponents[brown_team_id] = red_team_id
+                    else:  # red league
+                        cross_opponents[red_team_id] = brown_team_id
         
         # Process each team in this league
         for team_id, score in scores.items():
