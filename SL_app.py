@@ -181,7 +181,7 @@ class ESPNFantasyAPI:
             starting_positions = [0, 6, 11, 14, 18, 19, 23]
             
             for team in data.get('teams', []):
-                espn_team_id = team['id']  # Raw ESPN ID (1, 2, 3, etc.)
+                team_id = team['id']
                 total_score = 0
                 
                 roster = team.get('roster', {}).get('entries', [])
@@ -193,17 +193,10 @@ class ESPNFantasyAPI:
                         applied_total = player_pool_entry.get('appliedStatTotal', 0)
                         total_score += applied_total
                 
-                # Store with raw ID first
-                team_scores[espn_team_id] = total_score
+                team_scores[team_id] = total_score
             
-            # Convert all keys to prefixed strings
-            final_scores = {}
-            for raw_id, score in team_scores.items():
-                prefixed_key = f"{self.league_type}_{raw_id}"
-                final_scores[prefixed_key] = score
+            return team_scores
             
-            return final_scores
-        
         except Exception as e:
             st.error(f"Error getting live scores for {self.league_type}: {e}")
             return {}
@@ -578,32 +571,6 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week, debug_
     """Show live scores for both leagues"""
     st.header(f"Week {week} Live Scores")
     
-    # FORCE debug mode to see what's happening
-    st.subheader("FORCED Debug - Let's see what's wrong")
-    
-    # Check what get_live_scores actually returns
-    st.write("**Step 1: What get_live_scores returns**")
-    brown_scores = brown_api.get_live_scores(week)
-    red_scores = red_api.get_live_scores(week)
-    
-    st.write(f"Brown scores: {brown_scores}")
-    st.write(f"Red scores: {red_scores}")
-    st.write(f"Brown score keys type: {[type(k) for k in brown_scores.keys()]}")
-    st.write(f"Red score keys type: {[type(k) for k in red_scores.keys()]}")
-    
-    # Check what's in Google Sheets
-    st.write("**Step 2: What's in Google Sheets**")
-    st.write(f"Google Sheets team_ids: {list(all_teams['team_id'].values)}")
-    st.write(f"Google Sheets team_id types: {[type(x) for x in all_teams['team_id'].values[:3]]}")
-    
-    # Try direct matching
-    st.write("**Step 3: Direct matching test**")
-    for score_id in list(brown_scores.keys())[:2]:
-        matches = all_teams[all_teams['team_id'] == score_id]
-        st.write(f"Looking for {score_id} ({type(score_id)}): Found {len(matches)} matches")
-        if not matches.empty:
-            st.write(f"  -> {matches.iloc[0]['team_name']}")
-    
     calculator = ScoreCalculator(all_teams, brown_api, red_api, sheets_manager)
     weekly_data = calculator.calculate_weekly_scores(week)
     
@@ -622,17 +589,17 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week, debug_
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Brown League")
+        st.subheader("🤎 Brown Line League")
         brown_data = weekly_data[weekly_data['league'] == 'brown']
         display_league_scores(brown_data, all_teams, week_complete, debug_mode)
     
     with col2:
-        st.subheader("Red League")
+        st.subheader("🔴 Red Line League")
         red_data = weekly_data[weekly_data['league'] == 'red']
         if not red_data.empty:
             display_league_scores(red_data, all_teams, week_complete, debug_mode)
         else:
-            st.info("Red League data not available yet")
+            st.info("Red Line League data not available yet")
 
 def display_league_scores(league_data, all_teams, week_complete, debug_mode):
     """Display scores for one league"""
