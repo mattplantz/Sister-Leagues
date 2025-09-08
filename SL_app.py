@@ -171,38 +171,38 @@ class ESPNFantasyAPI:
         return pd.DataFrame(teams)
     
     def get_live_scores(self, week):
-    """Get live scores by calculating from player stats"""
-    try:
-        data = self.make_request("mRoster", week)
-        
-        team_scores = {}
-        
-        # Starting positions: QB(0), TE(6), DL(11), DB(14), P(18), HC(19), FLEX(23)
-        starting_positions = [0, 6, 11, 14, 18, 19, 23]
-        
-        for team in data.get('teams', []):
-            espn_team_id = team['id']  # Raw ESPN ID (1, 2, 3, etc.)
-            total_score = 0
+        """Get live scores by calculating from player stats"""
+        try:
+            data = self.make_request("mRoster", week)
             
-            roster = team.get('roster', {}).get('entries', [])
-            for player_entry in roster:
-                lineup_slot = player_entry.get('lineupSlotId', -1)
+            team_scores = {}
+            
+            # Starting positions: QB(0), TE(6), DL(11), DB(14), P(18), HC(19), FLEX(23)
+            starting_positions = [0, 6, 11, 14, 18, 19, 23]
+            
+            for team in data.get('teams', []):
+                espn_team_id = team['id']  # Raw ESPN ID (1, 2, 3, etc.)
+                total_score = 0
                 
-                if lineup_slot in starting_positions:
-                    player_pool_entry = player_entry.get('playerPoolEntry', {})
-                    applied_total = player_pool_entry.get('appliedStatTotal', 0)
-                    total_score += applied_total
+                roster = team.get('roster', {}).get('entries', [])
+                for player_entry in roster:
+                    lineup_slot = player_entry.get('lineupSlotId', -1)
+                    
+                    if lineup_slot in starting_positions:
+                        player_pool_entry = player_entry.get('playerPoolEntry', {})
+                        applied_total = player_pool_entry.get('appliedStatTotal', 0)
+                        total_score += applied_total
+                
+                # Store with raw ID first
+                team_scores[espn_team_id] = total_score
             
-            # Store with raw ID first
-            team_scores[espn_team_id] = total_score
-        
-        # Convert all keys to prefixed strings
-        final_scores = {}
-        for raw_id, score in team_scores.items():
-            prefixed_key = f"{self.league_type}_{raw_id}"
-            final_scores[prefixed_key] = score
-        
-        return final_scores
+            # Convert all keys to prefixed strings
+            final_scores = {}
+            for raw_id, score in team_scores.items():
+                prefixed_key = f"{self.league_type}_{raw_id}"
+                final_scores[prefixed_key] = score
+            
+            return final_scores
         
     except Exception as e:
         st.error(f"Error getting live scores for {self.league_type}: {e}")
