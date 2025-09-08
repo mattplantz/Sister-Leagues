@@ -400,7 +400,7 @@ def main():
     
     # Render selected page
     if page == "Live Scores":
-        show_live_scores(all_teams, brown_api, red_api, sheets_manager, selected_week)
+        show_live_scores(all_teams, brown_api, red_api, sheets_manager, selected_week, debug_mode)
     elif page == "Weekly Rankings":
         show_weekly_rankings(all_teams, brown_api, red_api, selected_week)
     elif page == "Season Standings":
