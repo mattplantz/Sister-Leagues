@@ -15,7 +15,7 @@ def test_espn_api():
     
     try:
         # Basic API call
-        url = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2024/segments/0/leagues/1732780114"
+        url = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/1732780114"
         
         # Test without auth first
         params = {"view": "mTeam"}
@@ -60,7 +60,7 @@ def test_espn_matchups():
     st.header("ESPN Matchups Test")
     
     try:
-        url = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2024/segments/0/leagues/1732780114"
+        url = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/1732780114"
         params = {"view": "mMatchup"}
         
         # Try with cookies if available
