@@ -530,6 +530,19 @@ def show_weekly_rankings(all_teams, brown_api, red_api, week):
                 'league': team_info.iloc[0]['league'],
                 'score': score
             })
+        else:
+            # Handle missing team info
+            league = 'red' if team_id > 100 else 'brown'
+            all_scores.append({
+                'team_id': team_id,
+                'team_name': f'Team {team_id} (Not Found)',
+                'league': league,
+                'score': score
+            })
+    
+    if not all_scores:
+        st.warning("No scores available for this week")
+        return
     
     rankings_df = pd.DataFrame(all_scores)
     rankings_df = rankings_df.sort_values('score', ascending=False).reset_index(drop=True)
@@ -655,3 +668,5 @@ def show_records(all_teams, sheets_manager):
 
 if __name__ == "__main__":
     main()
+
+google-auth-httplib2
