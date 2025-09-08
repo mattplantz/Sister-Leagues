@@ -571,38 +571,34 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week, debug_
     """Show live scores for both leagues"""
     st.header(f"Week {week} Live Scores")
     
+    # FORCE debug mode to see what's happening
+    st.subheader("FORCED Debug - Let's see what's wrong")
+    
+    # Check what get_live_scores actually returns
+    st.write("**Step 1: What get_live_scores returns**")
+    brown_scores = brown_api.get_live_scores(week)
+    red_scores = red_api.get_live_scores(week)
+    
+    st.write(f"Brown scores: {brown_scores}")
+    st.write(f"Red scores: {red_scores}")
+    st.write(f"Brown score keys type: {[type(k) for k in brown_scores.keys()]}")
+    st.write(f"Red score keys type: {[type(k) for k in red_scores.keys()]}")
+    
+    # Check what's in Google Sheets
+    st.write("**Step 2: What's in Google Sheets**")
+    st.write(f"Google Sheets team_ids: {list(all_teams['team_id'].values)}")
+    st.write(f"Google Sheets team_id types: {[type(x) for x in all_teams['team_id'].values[:3]]}")
+    
+    # Try direct matching
+    st.write("**Step 3: Direct matching test**")
+    for score_id in list(brown_scores.keys())[:2]:
+        matches = all_teams[all_teams['team_id'] == score_id]
+        st.write(f"Looking for {score_id} ({type(score_id)}): Found {len(matches)} matches")
+        if not matches.empty:
+            st.write(f"  -> {matches.iloc[0]['team_name']}")
+    
     calculator = ScoreCalculator(all_teams, brown_api, red_api, sheets_manager)
     weekly_data = calculator.calculate_weekly_scores(week)
-    
-    # Debug: Show what team IDs we're working with
-    if debug_mode:
-        st.subheader("Debug Information")
-        
-        brown_scores = brown_api.get_live_scores(week)
-        red_scores = red_api.get_live_scores(week)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Brown League Live Scores:**")
-            for team_id, score in brown_scores.items():
-                st.write(f"ID: {team_id}, Score: {score}")
-        
-        with col2:
-            st.write("**Red League Live Scores:**")
-            for team_id, score in red_scores.items():
-                st.write(f"ID: {team_id}, Score: {score}")
-        
-        st.write("**Weekly Data Team IDs:**")
-        if not weekly_data.empty:
-            unique_ids = weekly_data['team_id'].unique()
-            st.write(f"IDs in weekly_data: {list(unique_ids)}")
-        else:
-            st.write("No weekly data found")
-        
-        st.write("**Teams in Google Sheets:**")
-        st.dataframe(all_teams[['team_id', 'team_name', 'league']])
-        
-        st.write("---")
     
     if weekly_data.empty:
         st.warning(f"No data available for Week {week}")
