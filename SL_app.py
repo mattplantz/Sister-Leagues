@@ -251,11 +251,11 @@ class ScoreCalculator:
     
     def calculate_weekly_scores(self, week):
         """Calculate comprehensive weekly scores for both leagues"""
-        # Get scores from both leagues
+        # Get scores from both leagues (these now return prefixed IDs)
         brown_scores = self.brown_api.get_live_scores(week)
         red_scores = self.red_api.get_live_scores(week)
         
-        # Get intra-league matchups
+        # Get intra-league matchups (these now return prefixed IDs)
         brown_matchups = self.brown_api.get_matchups(week)
         red_matchups = self.red_api.get_matchups(week)
         
@@ -266,14 +266,14 @@ class ScoreCalculator:
         # Check if week is complete
         week_complete = self.brown_api.is_week_complete(week)
         
-        # Combine all scores
+        # Combine all scores (both use prefixed IDs now)
         all_scores = {**brown_scores, **red_scores}
         
-        # Calculate top 6 teams across both leagues
+        # Calculate top 6 teams across both leagues (using prefixed IDs)
         top6_teams = []
         if week_complete:
             sorted_scores = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
-            top6_teams = [team_id for team_id, score in sorted_scores[:6]]
+            top6_teams = [prefixed_team_id for prefixed_team_id, score in sorted_scores[:6]]
         
         # Process each league
         weekly_data = []
