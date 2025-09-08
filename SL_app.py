@@ -181,7 +181,7 @@ class ESPNFantasyAPI:
             starting_positions = [0, 6, 11, 14, 18, 19, 23]
             
             for team in data.get('teams', []):
-                team_id = team['id']
+                espn_team_id = team['id']  # Raw ESPN ID (1, 2, 3, etc.)
                 total_score = 0
                 
                 roster = team.get('roster', {}).get('entries', [])
@@ -193,10 +193,17 @@ class ESPNFantasyAPI:
                         applied_total = player_pool_entry.get('appliedStatTotal', 0)
                         total_score += applied_total
                 
-                team_scores[team_id] = total_score
+                # Store with raw ID first
+                team_scores[espn_team_id] = total_score
             
-            return team_scores
+            # Convert all keys to prefixed strings
+            final_scores = {}
+            for raw_id, score in team_scores.items():
+                prefixed_key = f"{self.league_type}_{raw_id}"
+                final_scores[prefixed_key] = score
             
+            return final_scores
+        
         except Exception as e:
             st.error(f"Error getting live scores for {self.league_type}: {e}")
             return {}
