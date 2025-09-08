@@ -571,6 +571,9 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week, debug_
     """Show live scores for both leagues"""
     st.header(f"Week {week} Live Scores")
     
+    calculator = ScoreCalculator(all_teams, brown_api, red_api, sheets_manager)
+    weekly_data = calculator.calculate_weekly_scores(week)
+    
     # Debug: Show what team IDs we're working with
     if debug_mode:
         st.subheader("Debug Information")
@@ -580,31 +583,25 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week, debug_
         
         col1, col2 = st.columns(2)
         with col1:
-            st.write("**Brown League Team IDs & Scores:**")
+            st.write("**Brown League Live Scores:**")
             for team_id, score in brown_scores.items():
                 st.write(f"ID: {team_id}, Score: {score}")
         
         with col2:
-            st.write("**Red League Team IDs & Scores:**")
+            st.write("**Red League Live Scores:**")
             for team_id, score in red_scores.items():
                 st.write(f"ID: {team_id}, Score: {score}")
         
-        st.write("**Teams in Google Sheets:**")
-        st.dataframe(all_teams[['team_id', 'team_name', 'league']])
-        
-        st.write("---")
-    
-    calculator = ScoreCalculator(all_teams, brown_api, red_api, sheets_manager)
-    weekly_data = calculator.calculate_weekly_scores(week)
-    
-    # Debug: Show what IDs are in weekly_data
-    if debug_mode:
         st.write("**Weekly Data Team IDs:**")
         if not weekly_data.empty:
             unique_ids = weekly_data['team_id'].unique()
             st.write(f"IDs in weekly_data: {list(unique_ids)}")
         else:
             st.write("No weekly data found")
+        
+        st.write("**Teams in Google Sheets:**")
+        st.dataframe(all_teams[['team_id', 'team_name', 'league']])
+        
         st.write("---")
     
     if weekly_data.empty:
@@ -614,20 +611,20 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week, debug_
     week_complete = weekly_data.iloc[0]['week_complete'] if not weekly_data.empty else False
     
     if week_complete:
-        st.success("✅ Week Complete - Points Awarded")
+        st.success("Week Complete - Points Awarded")
     else:
-        st.info("🔄 Live Scoring - Points will be awarded Tuesday morning")
+        st.info("Live Scoring - Points will be awarded Tuesday morning")
     
     # Show league sections
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("🤎 Brown League")
+        st.subheader("Brown League")
         brown_data = weekly_data[weekly_data['league'] == 'brown']
         display_league_scores(brown_data, all_teams, week_complete, debug_mode)
     
     with col2:
-        st.subheader("🔴 Red League")
+        st.subheader("Red League")
         red_data = weekly_data[weekly_data['league'] == 'red']
         if not red_data.empty:
             display_league_scores(red_data, all_teams, week_complete, debug_mode)
