@@ -760,21 +760,38 @@ def show_records(all_teams, sheets_manager):
     # Fill missing team names
     records['team_name'] = records['team_name'].fillna('Unknown Team')
     
-    # Display combined table
-    records['total_record'] = records['total_weekly_points'].astype(str) + '-' + records['weekly_losses'].astype(str)
-    records = records.sort_values('total_weekly_points', ascending=False)
+    # Display combined table - build columns list dynamically
+    display_columns = ['team_name', 'league']
+    column_config = {
+        "team_name": "Team",
+        "league": "League"
+    }
+    
+    # Add total record if we have the necessary columns
+    if 'total_weekly_points' in records.columns:
+        if 'weekly_losses' in records.columns:
+            records['total_record'] = records['total_weekly_points'].astype(str) + '-' + records['weekly_losses'].astype(str)
+        else:
+            records['total_record'] = records['total_weekly_points'].astype(str) + '-0'
+        display_columns.append('total_record')
+        column_config["total_record"] = "Overall Record"
+    
+    # Add individual point categories if they exist
+    if 'intra_league_points' in records.columns:
+        display_columns.append('intra_league_points')
+        column_config["intra_league_points"] = "Intra-League Wins"
+    if 'cross_league_points' in records.columns:
+        display_columns.append('cross_league_points')
+        column_config["cross_league_points"] = "Cross-League Wins"
+    if 'top6_points' in records.columns:
+        display_columns.append('top6_points')
+        column_config["top6_points"] = "Top 6 Wins"
+    
+    records = records.sort_values('total_weekly_points', ascending=False) if 'total_weekly_points' in records.columns else records
     
     st.dataframe(
-        records[['team_name', 'league', 'total_record', 'intra_league_points', 
-                'cross_league_points', 'top6_points']],
-        column_config={
-            "team_name": "Team",
-            "league": "League", 
-            "total_record": "Overall Record",
-            "intra_league_points": "Intra-League Wins",
-            "cross_league_points": "Cross-League Wins",
-            "top6_points": "Top 6 Wins"
-        },
+        records[display_columns],
+        column_config=column_config,
         use_container_width=True,
         hide_index=True
     )
