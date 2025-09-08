@@ -578,6 +578,16 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week, debug_
     calculator = ScoreCalculator(all_teams, brown_api, red_api, sheets_manager)
     weekly_data = calculator.calculate_weekly_scores(week)
     
+    # Debug: Show what IDs are in weekly_data
+    if debug_mode:
+        st.write("**Weekly Data Team IDs:**")
+        if not weekly_data.empty:
+            unique_ids = weekly_data['team_id'].unique()
+            st.write(f"IDs in weekly_data: {list(unique_ids)}")
+        else:
+            st.write("No weekly data found")
+        st.write("---")
+    
     if weekly_data.empty:
         st.warning(f"No data available for Week {week}")
         return
