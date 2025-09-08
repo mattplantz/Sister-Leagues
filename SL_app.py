@@ -450,33 +450,40 @@ def refresh_data(sheets_manager, brown_api, red_api, week):
             st.error(f"Error refreshing data: {e}")
 
 def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
-    """Show weekly matchups for all leagues - UPDATED: Stacked vertically in specified order"""
+    """Show weekly matchups for all leagues"""
     st.header(f"Week {week} Matchups")
     
-    # Get current scores for display
+    # DEBUG: Basic info
+    st.write("DEBUG: Starting show_weekly_matchups function")
+    st.write(f"DEBUG: Week = {week}")
+    st.write(f"DEBUG: all_teams shape: {all_teams.shape}")
+    
+    # Get current scores for display - ONE API call per league
     brown_scores = brown_api.get_live_scores(week)
     red_scores = red_api.get_live_scores(week)
     all_scores = {**brown_scores, **red_scores}
     
-    # Get matchups from APIs
-    brown_matchups = brown_api.get_matchups(week)
-    red_matchups = red_api.get_matchups(week)
+    st.write(f"DEBUG: brown_scores = {brown_scores}")
+    st.write(f"DEBUG: red_scores = {red_scores}")
+    st.write(f"DEBUG: all_scores = {all_scores}")
     
     # Get cross-league matchups from sheets
     cross_matchups = sheets_manager.get_worksheet_data("matchups")
     week_cross_matchups = cross_matchups[cross_matchups['week'] == week] if not cross_matchups.empty else pd.DataFrame()
     
-    # UPDATED: Stack sections vertically in specified order
+    # Stack sections vertically in specified order
     st.subheader("🔴 Red Line League Matchups")
-    display_intra_league_matchups(red_matchups, all_teams, all_scores, week, 'red')
+    st.write("DEBUG: About to call display_intra_league_matchups for red")
+    display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, 'red')
     
     st.subheader("🤎 Brown Line League Matchups")
-    display_intra_league_matchups(brown_matchups, all_teams, all_scores, week, 'brown')
+    st.write("DEBUG: About to call display_intra_league_matchups for brown")
+    display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, 'brown')
     
     st.subheader("⚔️ Cross-League Matchups")
     display_cross_league_matchups(week_cross_matchups, all_teams, all_scores)
     
-    st.subheader("🏆 Top 6 Scoreboard")  # UPDATED: Changed title from "All Teams Leaderboard"
+    st.subheader("🏆 Top 6 Scoreboard")
     display_all_teams_leaderboard(all_teams, all_scores)
 
 def display_intra_league_matchups(matchups, all_teams, all_scores, week, league):
