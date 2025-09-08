@@ -436,6 +436,24 @@ def refresh_data(sheets_manager, brown_api, red_api, week):
         except Exception as e:
             st.error(f"Error refreshing data: {e}")
 
+def force_refresh_teams(sheets_manager, brown_api, red_api):
+    """Force refresh team data from ESPN (will overwrite manual changes)"""
+    with st.spinner("Force refreshing team data..."):
+        try:
+            brown_teams = brown_api.get_teams()
+            try:
+                red_teams = red_api.get_teams()
+                all_teams = pd.concat([brown_teams, red_teams], ignore_index=True)
+            except:
+                all_teams = brown_teams
+                st.warning("Red League data not available")
+            
+            sheets_manager.update_worksheet("teams", all_teams)
+            st.success("Team data forcefully refreshed from ESPN!")
+            st.warning("Your manual team changes have been overwritten")
+        except Exception as e:
+            st.error(f"Error force refreshing teams: {e}")
+
 def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week):
     """Show live scores for both leagues"""
     st.header(f"Week {week} Live Scores")
@@ -627,3 +645,14 @@ def show_records(all_teams, sheets_manager):
 
 if __name__ == "__main__":
     main()
+
+
+# requirements.txt
+streamlit
+pandas
+numpy
+requests
+gspread
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
