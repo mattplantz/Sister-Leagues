@@ -470,23 +470,12 @@ if __name__ == "__main__":
     main()
 
 
-# requirements.txt
-streamlit
-pandas
-numpy
-requests
-gspread
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-
-
 # config.py - Configuration settings
 """Configuration settings for the Brown League Fantasy Dashboard"""
 
 # League Information
 LEAGUE_ID = "1732780114"
-SEASON = 2024
+SEASON = 2025
 MAX_WEEKS = 14
 
 # ESPN API Settings  
