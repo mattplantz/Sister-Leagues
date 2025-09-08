@@ -669,4 +669,3 @@ def show_records(all_teams, sheets_manager):
 if __name__ == "__main__":
     main()
 
-google-auth-httplib2
