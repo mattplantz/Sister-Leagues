@@ -647,12 +647,3 @@ if __name__ == "__main__":
     main()
 
 
-# requirements.txt
-streamlit
-pandas
-numpy
-requests
-gspread
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
