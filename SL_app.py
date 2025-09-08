@@ -507,7 +507,13 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week):
 def display_league_scores(league_data, all_teams, week_complete):
     """Display scores for one league"""
     for _, row in league_data.iterrows():
-        team_name = all_teams[all_teams['team_id'] == row['team_id']]['team_name'].iloc[0]
+        # Find team name with error handling
+        team_matches = all_teams[all_teams['team_id'] == row['team_id']]['team_name']
+        
+        if team_matches.empty:
+            team_name = f"Team {row['team_id']} (Not Found)"
+        else:
+            team_name = team_matches.iloc[0]
         
         st.write(f"**{team_name}**")
         st.write(f"Score: {row['actual_score']:.1f}")
