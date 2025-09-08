@@ -486,7 +486,7 @@ def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
     st.subheader("🏆 Top 6 Scoreboard")
     display_all_teams_leaderboard(all_teams, all_scores)
 
-def display_intra_league_matchups(matchups, all_teams, all_scores, week, league):
+def display_intra_league_matchups(sheet_manager, all_teams, all_scores, week, league):
     """Display intra-league matchups"""
     week_matchups = matchups[matchups['week'] == week] if not matchups.empty else pd.DataFrame()
     
