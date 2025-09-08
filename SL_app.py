@@ -474,6 +474,29 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week):
     """Show live scores for both leagues"""
     st.header(f"Week {week} Live Scores")
     
+    # Debug: Show what team IDs we're working with
+    if st.sidebar.checkbox("Show Debug Info"):
+        st.subheader("Debug Information")
+        
+        brown_scores = brown_api.get_live_scores(week)
+        red_scores = red_api.get_live_scores(week)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Brown League Team IDs & Scores:**")
+            for team_id, score in brown_scores.items():
+                st.write(f"ID: {team_id}, Score: {score}")
+        
+        with col2:
+            st.write("**Red League Team IDs & Scores:**")
+            for team_id, score in red_scores.items():
+                st.write(f"ID: {team_id}, Score: {score}")
+        
+        st.write("**Teams in Google Sheets:**")
+        st.dataframe(all_teams[['team_id', 'team_name', 'league']])
+        
+        st.write("---")
+    
     calculator = ScoreCalculator(all_teams, brown_api, red_api, sheets_manager)
     weekly_data = calculator.calculate_weekly_scores(week)
     
