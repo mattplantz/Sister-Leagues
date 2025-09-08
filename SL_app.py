@@ -15,7 +15,7 @@ def test_espn_api():
     
     try:
         # Basic API call
-        url = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/1732780114"
+        url = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2024/segments/0/leagues/1732780114"
         
         # Test without auth first
         params = {"view": "mTeam"}
@@ -60,7 +60,7 @@ def test_espn_matchups():
     st.header("ESPN Matchups Test")
     
     try:
-        url = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2025/segments/0/leagues/1732780114"
+        url = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2024/segments/0/leagues/1732780114"
         params = {"view": "mMatchup"}
         
         # Try with cookies if available
@@ -71,6 +71,8 @@ def test_espn_matchups():
                 'espn_s2': st.secrets['espn_s2']
             }
             st.write("**Using cookies for authentication**")
+        else:
+            st.warning("No ESPN cookies found in secrets")
         
         response = requests.get(url, params=params, cookies=cookies)
         st.write(f"**Status Code:** {response.status_code}")
@@ -78,24 +80,48 @@ def test_espn_matchups():
         if response.status_code == 200:
             data = response.json()
             
+            # Debug: Show raw schedule data structure
+            schedule = data.get('schedule', [])
+            st.write(f"**Total schedule entries:** {len(schedule)}")
+            
+            if len(schedule) > 0:
+                st.subheader("Raw Schedule Sample (First Entry)")
+                first_game = schedule[0]
+                st.json({
+                    'matchupPeriodId': first_game.get('matchupPeriodId'),
+                    'away_teamId': first_game.get('away', {}).get('teamId'),
+                    'home_teamId': first_game.get('home', {}).get('teamId'),
+                    'away_keys': list(first_game.get('away', {}).keys()),
+                    'home_keys': list(first_game.get('home', {}).keys())
+                })
+            
             # Parse matchups
             matchups = []
-            for game in data.get('schedule', []):
+            for game in schedule:
                 if 'away' not in game or 'home' not in game:
                     continue
                     
                 week_num = game.get('matchupPeriodId', 0)
-                away_team = game['away']['teamId']
-                home_team = game['home']['teamId']
+                away_team = game['away'].get('teamId')
+                home_team = game['home'].get('teamId')
+                
+                if not away_team or not home_team:
+                    continue
                 
                 # Get scores from the correct field
                 away_score = 0
                 home_score = 0
                 
+                # Try different score fields
                 if 'pointsByScoringPeriod' in game['away']:
                     away_score = game['away']['pointsByScoringPeriod'].get(str(week_num), 0)
+                elif 'totalPoints' in game['away']:
+                    away_score = game['away']['totalPoints']
+                    
                 if 'pointsByScoringPeriod' in game['home']:
-                    home_score = game['home']['pointsByScoringPeriod'].get(str(week_num), 0)
+                    home_score = game['home']['pointsByScoringPeriod'].get(str(week_num), 0) 
+                elif 'totalPoints' in game['home']:
+                    home_score = game['home']['totalPoints']
                 
                 matchups.append({
                     'week': week_num,
@@ -107,20 +133,37 @@ def test_espn_matchups():
                 })
             
             matchups_df = pd.DataFrame(matchups)
-            # Only show completed games
-            completed_games = matchups_df[(matchups_df['away_score'] > 0) | (matchups_df['home_score'] > 0)]
+            st.write(f"**Total parsed matchups:** {len(matchups_df)}")
             
-            st.subheader("Completed Games")
-            st.dataframe(completed_games)
+            if not matchups_df.empty:
+                # Only show completed games
+                completed_games = matchups_df[(matchups_df['away_score'] > 0) | (matchups_df['home_score'] > 0)]
+                st.write(f"**Completed games:** {len(completed_games)}")
+                
+                st.subheader("All Matchups (Including Unplayed)")
+                st.dataframe(matchups_df)
+                
+                if not completed_games.empty:
+                    st.subheader("Completed Games Only")
+                    st.dataframe(completed_games)
+                    return completed_games
+                else:
+                    st.warning("No completed games found")
+                    return matchups_df  # Return all matchups even if no scores
+            else:
+                st.error("No matchups parsed from API response")
+                return pd.DataFrame()  # Return empty DataFrame
             
-            return completed_games
         else:
             st.error(f"Matchups API Error: {response.status_code}")
-            return None
+            st.write("Response content:", response.text[:500])
+            return pd.DataFrame()
             
     except Exception as e:
-        st.error(f"Exception: {str(e)}")
-        return None
+        st.error(f"Exception in matchups test: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
+        return pd.DataFrame()
 
 def test_google_sheets():
     """Test Google Sheets connection"""
@@ -326,4 +369,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
