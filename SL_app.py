@@ -109,13 +109,29 @@ class ESPNFantasyAPI:
         
         matchups = []
         for game in data.get('schedule', []):
-            if 'away' in game and 'home' in game:
+            # Skip games without proper structure
+            if 'away' not in game or 'home' not in game:
+                continue
+                
+            # Get the actual score from the correct field
+            away_score = 0
+            home_score = 0
+            
+            # Check if game has been played (has points for specific week)
+            week_num = game.get('matchupPeriodId', 0)
+            if 'pointsByScoringPeriod' in game['away']:
+                away_score = game['away']['pointsByScoringPeriod'].get(str(week_num), 0)
+            if 'pointsByScoringPeriod' in game['home']:
+                home_score = game['home']['pointsByScoringPeriod'].get(str(week_num), 0)
+            
+            # Only include games that have been played (score > 0)
+            if away_score > 0 or home_score > 0:
                 matchups.append({
-                    'week': game['matchupPeriodId'],
+                    'week': week_num,
                     'away_team_id': game['away']['teamId'],
-                    'away_score': game['away'].get('totalPoints', 0),
-                    'home_team_id': game['home']['teamId'],
-                    'home_score': game['home'].get('totalPoints', 0)
+                    'away_score': away_score,
+                    'home_team_id': game['home']['teamId'], 
+                    'home_score': home_score
                 })
         
         return pd.DataFrame(matchups)
@@ -475,7 +491,7 @@ if __name__ == "__main__":
 
 # League Information
 LEAGUE_ID = "1732780114"
-SEASON = 2025
+SEASON = 2024
 MAX_WEEKS = 14
 
 # ESPN API Settings  
