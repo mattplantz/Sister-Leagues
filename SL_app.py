@@ -389,7 +389,7 @@ def main():
         return
     
     # Debug: Force refresh teams button
-    if st.sidebar.button("🔄 Force Reload Teams from Sheets"):
+    if st.sidebar.button("🔄 Force Reload Teams from Sheets", key="force_reload_teams"):
         st.cache_data.clear()
         all_teams = sheets_manager.get_worksheet_data("teams")
         st.success("Teams reloaded from Google Sheets!")
