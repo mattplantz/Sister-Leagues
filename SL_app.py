@@ -486,44 +486,85 @@ def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
     st.subheader("🏆 Top 6 Scoreboard")
     display_all_teams_leaderboard(all_teams, all_scores)
 
-def display_intra_league_matchups(sheet_manager, all_teams, all_scores, week, league):
-    """Display intra-league matchups"""
-    week_matchups = matchups[matchups['week'] == week] if not matchups.empty else pd.DataFrame()
+def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, league):
+    """Display intra-league matchups using Google Sheets data"""
+    # DEBUG: Show what we're working with
+    st.write(f"DEBUG - {league} league:")
+    st.write(f"all_scores keys: {list(all_scores.keys())}")
+    st.write(f"all_scores values: {list(all_scores.values())}")
+    
+    # Get matchups from the appropriate sheet
+    sheet_name = f"{league}_league_matchups"
+    matchups_df = sheets_manager.get_worksheet_data(sheet_name)
+    
+    st.write(f"DEBUG - Sheet '{sheet_name}' columns: {list(matchups_df.columns) if not matchups_df.empty else 'EMPTY'}")
+    st.write(f"DEBUG - Sheet data shape: {matchups_df.shape}")
+    
+    if matchups_df.empty:
+        st.info(f"No {league} line league matchups sheet found")
+        return
+    
+    # Filter for the specific week - FIXED: Use lowercase 'week'
+    week_matchups = matchups_df[matchups_df['week'] == week] if 'week' in matchups_df.columns else pd.DataFrame()
+    
+    st.write(f"DEBUG - Week {week} matchups shape: {week_matchups.shape}")
+    if not week_matchups.empty:
+        st.write(f"DEBUG - Week matchups data:")
+        st.dataframe(week_matchups)
     
     if week_matchups.empty:
-        st.info(f"No {league} line league matchups found for week {week}")  # UPDATED: Added "line"
+        st.info(f"No {league} line league matchups found for week {week}")
         return
     
     for _, matchup in week_matchups.iterrows():
-        away_id = matchup['away_team_id']
-        home_id = matchup['home_team_id']
+        team1_manager = matchup.get('team1_manager', '')
+        team2_manager = matchup.get('team2_manager', '')
         
-        # Get team names
-        away_team = all_teams[all_teams['team_id'] == away_id]
-        home_team = all_teams[all_teams['team_id'] == home_id]
+        st.write(f"DEBUG - Looking for managers: '{team1_manager}' and '{team2_manager}'")
         
-        away_name = away_team.iloc[0]['team_name'] if not away_team.empty else f"Team {away_id}"
-        home_name = home_team.iloc[0]['team_name'] if not home_team.empty else f"Team {home_id}"
+        # Find teams by manager names
+        team1 = all_teams[
+            (all_teams['team_name'] == team1_manager) & 
+            (all_teams['league'] == league)
+        ]
+        team2 = all_teams[
+            (all_teams['team_name'] == team2_manager) & 
+            (all_teams['league'] == league)
+        ]
+        
+        st.write(f"DEBUG - team1 found: {not team1.empty}, team2 found: {not team2.empty}")
+        if not team1.empty:
+            st.write(f"DEBUG - team1_id: {team1.iloc[0]['team_id']}")
+        if not team2.empty:
+            st.write(f"DEBUG - team2_id: {team2.iloc[0]['team_id']}")
+        
+        if team1.empty or team2.empty:
+            continue
+        
+        team1_id = team1.iloc[0]['team_id']
+        team2_id = team2.iloc[0]['team_id']
         
         # Get scores
-        away_score = all_scores.get(away_id, 0)
-        home_score = all_scores.get(home_id, 0)
+        team1_score = all_scores.get(team1_id, 0)
+        team2_score = all_scores.get(team2_id, 0)
+        
+        st.write(f"DEBUG - Scores: {team1_id}={team1_score}, {team2_id}={team2_score}")
         
         # Display matchup
         with st.container():
-            col_away, col_vs, col_home = st.columns([2, 1, 2])
+            col_team1, col_vs, col_team2 = st.columns([2, 1, 2])
             
-            with col_away:
-                st.write(f"**{away_name}**")
-                st.metric("Score", f"{away_score:.1f}")
+            with col_team1:
+                st.write(f"**{team1_manager}**")
+                st.metric("Score", f"{team1_score:.1f}")
             
             with col_vs:
                 st.write("")
                 st.write("**VS**")
             
-            with col_home:
-                st.write(f"**{home_name}**")
-                st.metric("Score", f"{home_score:.1f}")
+            with col_team2:
+                st.write(f"**{team2_manager}**")
+                st.metric("Score", f"{team2_score:.1f}")
             
             st.divider()
 
