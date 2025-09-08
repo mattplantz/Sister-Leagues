@@ -524,11 +524,29 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week):
 def display_league_scores(league_data, all_teams, week_complete):
     """Display scores for one league"""
     for _, row in league_data.iterrows():
-        # Find team name with error handling
-        team_matches = all_teams[all_teams['team_id'] == row['team_id']]['team_name']
+        team_id = row['team_id']
+        
+        # Debug: Show what we're trying to match
+        if st.sidebar.checkbox("Show Team Lookup Debug"):
+            st.write(f"Looking for team_id: {team_id} (type: {type(team_id)})")
+            st.write(f"Available team_ids in sheets: {list(all_teams['team_id'].values)} (types: {[type(x) for x in all_teams['team_id'].values[:3]]})")
+        
+        # Find team name with error handling - try both exact match and string conversion
+        team_matches = all_teams[all_teams['team_id'] == team_id]['team_name']
         
         if team_matches.empty:
-            team_name = f"Team {row['team_id']} (Not Found)"
+            # Try converting team_id to string and match
+            team_matches = all_teams[all_teams['team_id'].astype(str) == str(team_id)]['team_name']
+        
+        if team_matches.empty:
+            # Try converting both to int and match
+            try:
+                team_matches = all_teams[all_teams['team_id'].astype(int) == int(team_id)]['team_name']
+            except:
+                pass
+        
+        if team_matches.empty:
+            team_name = f"Team {team_id} (Not Found)"
         else:
             team_name = team_matches.iloc[0]
         
