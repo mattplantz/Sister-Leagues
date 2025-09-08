@@ -104,6 +104,40 @@ class ESPNFantasyAPI:
             
             team_scores = {}
             
+            # Debug: Let's see what lineup slots we're getting
+            if st.sidebar.checkbox("Debug Mode - Show Lineup Slots"):
+                st.subheader("Debug: Lineup Slot Analysis")
+                for team in data.get('teams', []):
+                    team_name = f"{team.get('location', 'Team')} {team.get('nickname', str(team['id']))}"
+                    st.write(f"**{team_name} (ID: {team['id']})**")
+                    
+                    roster = team.get('roster', {}).get('entries', [])
+                    slot_analysis = {}
+                    
+                    for player_entry in roster:
+                        lineup_slot = player_entry.get('lineupSlotId', -1)
+                        player_pool_entry = player_entry.get('playerPoolEntry', {})
+                        applied_total = player_pool_entry.get('appliedStatTotal', 0)
+                        player_name = player_pool_entry.get('player', {}).get('fullName', 'Unknown')
+                        
+                        if lineup_slot not in slot_analysis:
+                            slot_analysis[lineup_slot] = []
+                        slot_analysis[lineup_slot].append({
+                            'player': player_name,
+                            'points': applied_total
+                        })
+                    
+                    # Show slot breakdown
+                    for slot_id, players in sorted(slot_analysis.items()):
+                        st.write(f"  Slot {slot_id}: {len(players)} players")
+                        for player in players:
+                            st.write(f"    - {player['player']}: {player['points']} pts")
+                    st.write("---")
+            
+            # Calculate scores - for now let's be conservative with starting positions
+            # Common ESPN starting positions: 0-2 (QB, RB, WR), 4-6 (TE, K, DEF), 20-23 (FLEX)
+            starting_positions = [0, 1, 2, 3, 4, 5, 6, 16, 17, 20, 21, 22, 23]
+            
             for team in data.get('teams', []):
                 team_id = team['id']
                 total_score = 0
@@ -112,8 +146,8 @@ class ESPNFantasyAPI:
                 for player_entry in roster:
                     lineup_slot = player_entry.get('lineupSlotId', -1)
                     
-                    # Only starting lineup positions (0-23 are typical starting slots)
-                    if lineup_slot >= 0 and lineup_slot <= 23:
+                    # Only starting lineup positions
+                    if lineup_slot in starting_positions:
                         player_pool_entry = player_entry.get('playerPoolEntry', {})
                         applied_total = player_pool_entry.get('appliedStatTotal', 0)
                         total_score += applied_total
