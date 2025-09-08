@@ -204,9 +204,9 @@ class ESPNFantasyAPI:
             
             return final_scores
         
-    except Exception as e:
-        st.error(f"Error getting live scores for {self.league_type}: {e}")
-        return {}
+        except Exception as e:
+            st.error(f"Error getting live scores for {self.league_type}: {e}")
+            return {}
     
     def get_matchups(self, week=None):
         """Get matchup structure"""
