@@ -245,13 +245,25 @@ def main():
         ["Live Scores", "Weekly Rankings", "Season Standings"]
     )
     
-    # Load teams data
+    # Load teams data - force refresh to get updated names
+    if st.sidebar.button("🔄 Refresh Team Names"):
+        with st.spinner("Refreshing team data..."):
+            teams_df = espn_api.get_teams()
+            sheets_manager.update_worksheet("teams", teams_df)
+            st.success("Team names updated!")
+            st.rerun()
+    
     teams_df = sheets_manager.get_worksheet_data("teams")
     if teams_df.empty:
         with st.spinner("Loading teams from ESPN..."):
             teams_df = espn_api.get_teams()
             if not teams_df.empty:
                 sheets_manager.update_worksheet("teams", teams_df)
+    
+    # Debug: Show what team names we actually have
+    if st.sidebar.checkbox("Debug - Show Team Data"):
+        st.subheader("Current Team Data")
+        st.dataframe(teams_df)
     
     if teams_df.empty:
         st.error("Unable to load team data")
