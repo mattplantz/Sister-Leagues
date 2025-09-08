@@ -381,24 +381,18 @@ def main():
         ["Live Scores", "Weekly Rankings", "Season Standings", "Records"]
     )
     
-    # Load teams data for both leagues
-    brown_teams = sheets_manager.get_worksheet_data("teams")
-    red_teams = pd.DataFrame()  # Will implement when Red League manager mapping is available
+    # Load teams data for both leagues - ALWAYS use Google Sheets
+    all_teams = sheets_manager.get_worksheet_data("teams")
     
-    if brown_teams.empty:
-        with st.spinner("Loading Brown League teams..."):
-            brown_teams = brown_api.get_teams()
-            if not brown_teams.empty:
-                sheets_manager.update_worksheet("teams", brown_teams)
+    if all_teams.empty:
+        st.error("No team data found in Google Sheets. Please check the 'teams' tab.")
+        return
     
-    # Try to load Red League teams
-    try:
-        red_teams = red_api.get_teams()
-    except:
-        st.sidebar.warning("Red League not fully configured yet")
-    
-    # Combine team data
-    all_teams = pd.concat([brown_teams, red_teams], ignore_index=True) if not red_teams.empty else brown_teams
+    # Debug: Force refresh teams button
+    if st.sidebar.button("🔄 Force Reload Teams from Sheets"):
+        st.cache_data.clear()
+        all_teams = sheets_manager.get_worksheet_data("teams")
+        st.success("Teams reloaded from Google Sheets!")
     
     if all_teams.empty:
         st.error("Unable to load team data")
