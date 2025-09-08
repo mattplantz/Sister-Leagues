@@ -88,6 +88,42 @@ class ESPNFantasyAPI:
         else:
             raise Exception(f"ESPN API Error for {self.league_type}: {response.status_code}")
     
+    def get_teams_debug_info(self):
+        """Get raw team data for debugging - helps identify correct IDs and manager names"""
+        try:
+            data = self.make_request("mTeam")
+            teams_info = []
+            
+            for team in data.get('teams', []):
+                team_info = {
+                    'team_id': team['id'],
+                    'location': team.get('location', ''),
+                    'nickname': team.get('nickname', ''),
+                    'owner_id': team.get('primaryOwner', 'Unknown'),
+                    'raw_team_data': team  # Include raw data for debugging
+                }
+                
+                # Try to get owner info from members
+                members = data.get('members', [])
+                for member in members:
+                    if member.get('id') == team.get('primaryOwner'):
+                        team_info['owner_display_name'] = member.get('displayName', 'Unknown')
+                        team_info['owner_first_name'] = member.get('firstName', '')
+                        team_info['owner_last_name'] = member.get('lastName', '')
+                        break
+                else:
+                    team_info['owner_display_name'] = 'Unknown'
+                    team_info['owner_first_name'] = ''
+                    team_info['owner_last_name'] = ''
+                
+                teams_info.append(team_info)
+            
+            return teams_info
+            
+        except Exception as e:
+            st.error(f"Error getting debug info for {self.league_type}: {e}")
+            return []
+    
     def get_teams(self):
         """Get team information"""
         data = self.make_request("mTeam")
@@ -102,14 +138,14 @@ class ESPNFantasyAPI:
                 5: 'Michael McCormick',
                 6: 'Will Grant'
             }
-        else:  # red league - PLACEHOLDER - update these once you have the correct names
+        else:  # red league - These are placeholders, update based on debug info
             manager_mapping = {
-                1: 'Red Team 1 Manager',  # Replace with actual manager name
-                2: 'Red Team 2 Manager',  # Replace with actual manager name
-                3: 'Red Team 3 Manager',  # Replace with actual manager name
-                4: 'Red Team 4 Manager',  # Replace with actual manager name
-                5: 'Red Team 5 Manager',  # Replace with actual manager name
-                6: 'Red Team 6 Manager'   # Replace with actual manager name
+                1: 'Red Team 1 Manager',  # Update with actual manager name
+                2: 'Red Team 2 Manager',  # Update with actual manager name
+                3: 'Red Team 3 Manager',  # Update with actual manager name
+                4: 'Red Team 4 Manager',  # Update with actual manager name
+                5: 'Red Team 5 Manager',  # Update with actual manager name
+                6: 'Red Team 6 Manager'   # Update with actual manager name
             }
         
         teams = []
@@ -371,9 +407,16 @@ def main():
         index=current_week-1
     )
     
+    # Debug mode toggle - FIXED: Now properly defined
+    debug_mode = st.sidebar.checkbox("Show Debug Info", value=False)
+    
     # Manual refresh button
     if st.sidebar.button("🔄 Refresh Data", type="primary"):
         refresh_data(sheets_manager, brown_api, red_api, selected_week)
+    
+    # Debug: Add Red League team debug button
+    if st.sidebar.button("🔍 Debug Red League Teams", help="Show raw Red League team data to help with ID mapping"):
+        debug_red_league_teams(red_api)
     
     # Page selector
     page = st.sidebar.selectbox(
@@ -407,6 +450,47 @@ def main():
         show_season_standings(all_teams, sheets_manager)
     elif page == "Records":
         show_records(all_teams, sheets_manager)
+
+def debug_red_league_teams(red_api):
+    """Debug function to show raw Red League team data"""
+    st.subheader("🔍 Red League Team Debug Info")
+    
+    try:
+        teams_debug = red_api.get_teams_debug_info()
+        
+        if teams_debug:
+            st.success("✅ Successfully connected to Red League!")
+            
+            for team_info in teams_debug:
+                with st.expander(f"Team ID {team_info['team_id']} - {team_info['location']} {team_info['nickname']}"):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write("**Team Info:**")
+                        st.write(f"ID: {team_info['team_id']}")
+                        st.write(f"Location: {team_info['location']}")
+                        st.write(f"Nickname: {team_info['nickname']}")
+                        st.write(f"Owner ID: {team_info['owner_id']}")
+                    
+                    with col2:
+                        st.write("**Manager Info:**")
+                        st.write(f"Display Name: {team_info['owner_display_name']}")
+                        st.write(f"First Name: {team_info['owner_first_name']}")
+                        st.write(f"Last Name: {team_info['owner_last_name']}")
+                        
+                        # Suggested mapping
+                        full_name = f"{team_info['owner_first_name']} {team_info['owner_last_name']}".strip()
+                        if full_name:
+                            st.write(f"**Suggested mapping: {team_info['team_id']}: '{full_name}'**")
+            
+            st.info("💡 Use the suggested mappings above to update the manager_mapping in the get_teams() method for the red league.")
+            
+        else:
+            st.error("❌ No team data found. Check your Red League credentials.")
+            
+    except Exception as e:
+        st.error(f"❌ Error connecting to Red League: {e}")
+        st.info("This usually means your red_swid and red_espn_s2 credentials are missing or incorrect.")
 
 def refresh_data(sheets_manager, brown_api, red_api, week):
     """Refresh data from both leagues"""
@@ -464,12 +548,12 @@ def force_refresh_teams(sheets_manager, brown_api, red_api):
         except Exception as e:
             st.error(f"Error force refreshing teams: {e}")
 
-def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week):
+def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week, debug_mode):
     """Show live scores for both leagues"""
     st.header(f"Week {week} Live Scores")
     
     # Debug: Show what team IDs we're working with
-    if st.sidebar.checkbox("Show Debug Info"):
+    if debug_mode:
         st.subheader("Debug Information")
         
         brown_scores = brown_api.get_live_scores(week)
@@ -511,23 +595,23 @@ def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week):
     with col1:
         st.subheader("🤎 Brown League")
         brown_data = weekly_data[weekly_data['league'] == 'brown']
-        display_league_scores(brown_data, all_teams, week_complete)
+        display_league_scores(brown_data, all_teams, week_complete, debug_mode)
     
     with col2:
         st.subheader("🔴 Red League")
         red_data = weekly_data[weekly_data['league'] == 'red']
         if not red_data.empty:
-            display_league_scores(red_data, all_teams, week_complete)
+            display_league_scores(red_data, all_teams, week_complete, debug_mode)
         else:
             st.info("Red League data not available yet")
 
-def display_league_scores(league_data, all_teams, week_complete):
+def display_league_scores(league_data, all_teams, week_complete, debug_mode):
     """Display scores for one league"""
     for _, row in league_data.iterrows():
         team_id = row['team_id']
         
         # Debug: Show what we're trying to match
-        if st.sidebar.checkbox("Show Team Lookup Debug"):
+        if debug_mode:
             st.write(f"Looking for team_id: {team_id} (type: {type(team_id)})")
             st.write(f"Available team_ids in sheets: {list(all_teams['team_id'].values)} (types: {[type(x) for x in all_teams['team_id'].values[:3]]})")
         
