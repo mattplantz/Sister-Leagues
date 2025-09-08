@@ -453,19 +453,10 @@ def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
     """Show weekly matchups for all leagues"""
     st.header(f"Week {week} Matchups")
     
-    # DEBUG: Basic info
-    st.write("DEBUG: Starting show_weekly_matchups function")
-    st.write(f"DEBUG: Week = {week}")
-    st.write(f"DEBUG: all_teams shape: {all_teams.shape}")
-    
     # Get current scores for display - ONE API call per league
     brown_scores = brown_api.get_live_scores(week)
     red_scores = red_api.get_live_scores(week)
     all_scores = {**brown_scores, **red_scores}
-    
-    st.write(f"DEBUG: brown_scores = {brown_scores}")
-    st.write(f"DEBUG: red_scores = {red_scores}")
-    st.write(f"DEBUG: all_scores = {all_scores}")
     
     # Get cross-league matchups from sheets
     cross_matchups = sheets_manager.get_worksheet_data("matchups")
@@ -473,11 +464,8 @@ def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
     
     # Stack sections vertically in specified order
     st.subheader("🔴 Red Line League Matchups")
-    st.write("DEBUG: About to call display_intra_league_matchups for red")
     display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, 'red')
     
-    st.subheader("🤎 Brown Line League Matchups")
-    st.write("DEBUG: About to call display_intra_league_matchups for brown")
     display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, 'brown')
     
     st.subheader("⚔️ Cross-League Matchups")
@@ -488,17 +476,10 @@ def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
 
 def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, league):
     """Display intra-league matchups using Google Sheets data"""
-    # DEBUG: Show what we're working with
-    st.write(f"DEBUG - {league} league:")
-    st.write(f"all_scores keys: {list(all_scores.keys())}")
-    st.write(f"all_scores values: {list(all_scores.values())}")
     
     # Get matchups from the appropriate sheet
     sheet_name = f"{league}_league_matchups"
     matchups_df = sheets_manager.get_worksheet_data(sheet_name)
-    
-    st.write(f"DEBUG - Sheet '{sheet_name}' columns: {list(matchups_df.columns) if not matchups_df.empty else 'EMPTY'}")
-    st.write(f"DEBUG - Sheet data shape: {matchups_df.shape}")
     
     if matchups_df.empty:
         st.info(f"No {league} line league matchups sheet found")
@@ -507,7 +488,6 @@ def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, l
     # Filter for the specific week - FIXED: Use lowercase 'week'
     week_matchups = matchups_df[matchups_df['week'] == week] if 'week' in matchups_df.columns else pd.DataFrame()
     
-    st.write(f"DEBUG - Week {week} matchups shape: {week_matchups.shape}")
     if not week_matchups.empty:
         st.write(f"DEBUG - Week matchups data:")
         st.dataframe(week_matchups)
@@ -520,7 +500,6 @@ def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, l
         team1_manager = matchup.get('team1_manager', '')
         team2_manager = matchup.get('team2_manager', '')
         
-        st.write(f"DEBUG - Looking for managers: '{team1_manager}' and '{team2_manager}'")
         
         # Find teams by manager names
         team1 = all_teams[
@@ -547,8 +526,6 @@ def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, l
         # Get scores
         team1_score = all_scores.get(team1_id, 0)
         team2_score = all_scores.get(team2_id, 0)
-        
-        st.write(f"DEBUG - Scores: {team1_id}={team1_score}, {team2_id}={team2_score}")
         
         # Display matchup
         with st.container():
