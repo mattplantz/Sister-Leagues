@@ -102,16 +102,26 @@ class ESPNFantasyAPI:
                 5: 'Michael McCormick',
                 6: 'Will Grant'
             }
-        else:  # red league - will need manager names later
-            manager_mapping = {}
+        else:  # red league - PLACEHOLDER - update these once you have the correct names
+            manager_mapping = {
+                1: 'Red Team 1 Manager',  # Replace with actual manager name
+                2: 'Red Team 2 Manager',  # Replace with actual manager name
+                3: 'Red Team 3 Manager',  # Replace with actual manager name
+                4: 'Red Team 4 Manager',  # Replace with actual manager name
+                5: 'Red Team 5 Manager',  # Replace with actual manager name
+                6: 'Red Team 6 Manager'   # Replace with actual manager name
+            }
         
         teams = []
         for team in data.get('teams', []):
             team_id = team['id']
-            if self.league_type == "brown":
-                team_name = manager_mapping.get(team_id, f"Team {team_id}")
-            else:
-                team_name = f"{team.get('location', 'Team')} {team.get('nickname', str(team_id))}"
+            
+            # Use manager names for both leagues now
+            team_name = manager_mapping.get(team_id, f"Team {team_id}")
+            
+            # Make Red League team IDs unique by adding 100
+            if self.league_type == "red":
+                team_id = team_id + 100
             
             teams.append({
                 'team_id': team_id,
@@ -645,5 +655,3 @@ def show_records(all_teams, sheets_manager):
 
 if __name__ == "__main__":
     main()
-
-
