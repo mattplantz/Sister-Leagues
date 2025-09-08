@@ -251,13 +251,23 @@ class ScoreCalculator:
     
     def calculate_weekly_scores(self, week):
         """Calculate comprehensive weekly scores for both leagues"""
-        # Get scores from both leagues (these now return prefixed IDs)
+        # Get scores from both leagues (these should return prefixed IDs)
         brown_scores = self.brown_api.get_live_scores(week)
         red_scores = self.red_api.get_live_scores(week)
         
-        # Get intra-league matchups (these now return prefixed IDs)
+        # Debug: Print what we got from live scores
+        print(f"DEBUG: Brown scores keys: {list(brown_scores.keys())}")
+        print(f"DEBUG: Red scores keys: {list(red_scores.keys())}")
+        
+        # Get intra-league matchups (these should return prefixed IDs)
         brown_matchups = self.brown_api.get_matchups(week)
         red_matchups = self.red_api.get_matchups(week)
+        
+        # Debug: Print matchup IDs
+        if not brown_matchups.empty:
+            print(f"DEBUG: Brown matchup IDs: {brown_matchups[['away_team_id', 'home_team_id']].values}")
+        if not red_matchups.empty:
+            print(f"DEBUG: Red matchup IDs: {red_matchups[['away_team_id', 'home_team_id']].values}")
         
         # Get cross-league matchups from Google Sheets
         cross_matchups = self.sheets_manager.get_worksheet_data("matchups")
@@ -266,31 +276,40 @@ class ScoreCalculator:
         # Check if week is complete
         week_complete = self.brown_api.is_week_complete(week)
         
-        # Combine all scores (both use prefixed IDs now)
+        # Combine all scores (both should use prefixed IDs now)
         all_scores = {**brown_scores, **red_scores}
+        print(f"DEBUG: Combined scores keys: {list(all_scores.keys())}")
         
         # Calculate top 6 teams across both leagues (using prefixed IDs)
         top6_teams = []
         if week_complete:
             sorted_scores = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
             top6_teams = [prefixed_team_id for prefixed_team_id, score in sorted_scores[:6]]
+            print(f"DEBUG: Top 6 teams: {top6_teams}")
         
         # Process each league
         weekly_data = []
         
         # Process Brown League
-        weekly_data.extend(self._process_league_scores(
+        brown_data = self._process_league_scores(
             brown_scores, brown_matchups, week_cross_matchups, 
             'brown', week, week_complete, top6_teams
-        ))
+        )
+        print(f"DEBUG: Brown data team IDs: {[item['team_id'] for item in brown_data]}")
+        weekly_data.extend(brown_data)
         
         # Process Red League  
-        weekly_data.extend(self._process_league_scores(
+        red_data = self._process_league_scores(
             red_scores, red_matchups, week_cross_matchups, 
             'red', week, week_complete, top6_teams
-        ))
+        )
+        print(f"DEBUG: Red data team IDs: {[item['team_id'] for item in red_data]}")
+        weekly_data.extend(red_data)
         
-        return pd.DataFrame(weekly_data)
+        result_df = pd.DataFrame(weekly_data)
+        print(f"DEBUG: Final dataframe team IDs: {list(result_df['team_id'].values) if not result_df.empty else 'Empty'}")
+        
+        return result_df
     
     def _process_league_scores(self, scores, matchups, cross_matchups, league, week, week_complete, top6_teams):
         """Process scores for a single league"""
