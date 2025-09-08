@@ -327,8 +327,8 @@ class ScoreCalculator:
         cross_opponents = {}
         if not cross_matchups.empty:
             for _, match in cross_matchups.iterrows():
-                brown_manager = match.get('brown_league_manager', '')
-                red_manager = match.get('red_league_manager', '')
+                brown_manager = match.get('brown_league_team', '')
+                red_manager = match.get('red_league_team', '')
                 
                 # Find Brown League team by manager name
                 brown_team = self.all_teams_df[
@@ -444,10 +444,10 @@ def main():
     if st.sidebar.button("🔍 Debug Red League Teams", help="Show raw Red League team data to help with ID mapping"):
         debug_red_league_teams(red_api)
     
-    # Page selector
+    # Page selector - UPDATED: Added Weekly Matchups
     page = st.sidebar.selectbox(
         "Select View", 
-        ["Live Scores", "Weekly Rankings", "Season Standings", "Records"]
+        ["Live Scores", "Weekly Matchups", "Weekly Rankings", "Season Standings", "Records"]
     )
     
     # Load teams data for both leagues - ALWAYS use Google Sheets
@@ -470,6 +470,8 @@ def main():
     # Render selected page
     if page == "Live Scores":
         show_live_scores(all_teams, brown_api, red_api, sheets_manager, selected_week, debug_mode)
+    elif page == "Weekly Matchups":
+        show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, selected_week)
     elif page == "Weekly Rankings":
         show_weekly_rankings(all_teams, brown_api, red_api, selected_week)
     elif page == "Season Standings":
@@ -573,6 +575,168 @@ def force_refresh_teams(sheets_manager, brown_api, red_api):
             st.warning("Your manual team changes have been overwritten")
         except Exception as e:
             st.error(f"Error force refreshing teams: {e}")
+
+def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
+    """Show weekly matchups for all leagues"""
+    st.header(f"Week {week} Matchups")
+    
+    # Get current scores for display
+    brown_scores = brown_api.get_live_scores(week)
+    red_scores = red_api.get_live_scores(week)
+    all_scores = {**brown_scores, **red_scores}
+    
+    # Get matchups from APIs
+    brown_matchups = brown_api.get_matchups(week)
+    red_matchups = red_api.get_matchups(week)
+    
+    # Get cross-league matchups from sheets
+    cross_matchups = sheets_manager.get_worksheet_data("matchups")
+    week_cross_matchups = cross_matchups[cross_matchups['week'] == week] if not cross_matchups.empty else pd.DataFrame()
+    
+    # Create four sections
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🤎 Brown League Matchups")
+        display_intra_league_matchups(brown_matchups, all_teams, all_scores, week, 'brown')
+        
+        st.subheader("🔴 Red League Matchups")
+        display_intra_league_matchups(red_matchups, all_teams, all_scores, week, 'red')
+    
+    with col2:
+        st.subheader("⚔️ Cross-League Matchups")
+        display_cross_league_matchups(week_cross_matchups, all_teams, all_scores)
+        
+        st.subheader("🏆 All Teams Leaderboard")
+        display_all_teams_leaderboard(all_teams, all_scores)
+
+def display_intra_league_matchups(matchups, all_teams, all_scores, week, league):
+    """Display intra-league matchups"""
+    week_matchups = matchups[matchups['week'] == week] if not matchups.empty else pd.DataFrame()
+    
+    if week_matchups.empty:
+        st.info(f"No {league} league matchups found for week {week}")
+        return
+    
+    for _, matchup in week_matchups.iterrows():
+        away_id = matchup['away_team_id']
+        home_id = matchup['home_team_id']
+        
+        # Get team names
+        away_team = all_teams[all_teams['team_id'] == away_id]
+        home_team = all_teams[all_teams['team_id'] == home_id]
+        
+        away_name = away_team.iloc[0]['team_name'] if not away_team.empty else f"Team {away_id}"
+        home_name = home_team.iloc[0]['team_name'] if not home_team.empty else f"Team {home_id}"
+        
+        # Get scores
+        away_score = all_scores.get(away_id, 0)
+        home_score = all_scores.get(home_id, 0)
+        
+        # Display matchup
+        with st.container():
+            col_away, col_vs, col_home = st.columns([2, 1, 2])
+            
+            with col_away:
+                st.write(f"**{away_name}**")
+                st.metric("Score", f"{away_score:.1f}")
+            
+            with col_vs:
+                st.write("")
+                st.write("**VS**")
+            
+            with col_home:
+                st.write(f"**{home_name}**")
+                st.metric("Score", f"{home_score:.1f}")
+            
+            st.divider()
+
+def display_cross_league_matchups(cross_matchups, all_teams, all_scores):
+    """Display cross-league matchups"""
+    if cross_matchups.empty:
+        st.info("No cross-league matchups found for this week")
+        return
+    
+    for _, matchup in cross_matchups.iterrows():
+        brown_manager = matchup.get('brown_league_team', '')
+        red_manager = matchup.get('red_league_team', '')
+        
+        # Find teams by manager names
+        brown_team = all_teams[
+            (all_teams['team_name'] == brown_manager) & 
+            (all_teams['league'] == 'brown')
+        ]
+        red_team = all_teams[
+            (all_teams['team_name'] == red_manager) & 
+            (all_teams['league'] == 'red')
+        ]
+        
+        if brown_team.empty or red_team.empty:
+            continue
+        
+        brown_id = brown_team.iloc[0]['team_id']
+        red_id = red_team.iloc[0]['team_id']
+        
+        # Get scores
+        brown_score = all_scores.get(brown_id, 0)
+        red_score = all_scores.get(red_id, 0)
+        
+        # Display matchup
+        with st.container():
+            col_brown, col_vs, col_red = st.columns([2, 1, 2])
+            
+            with col_brown:
+                st.write(f"🤎 **{brown_manager}**")
+                st.metric("Score", f"{brown_score:.1f}")
+            
+            with col_vs:
+                st.write("")
+                st.write("**VS**")
+            
+            with col_red:
+                st.write(f"🔴 **{red_manager}**")
+                st.metric("Score", f"{red_score:.1f}")
+            
+            st.divider()
+
+def display_all_teams_leaderboard(all_teams, all_scores):
+    """Display all 12 teams sorted by current week score"""
+    # Create leaderboard data
+    leaderboard = []
+    
+    for _, team in all_teams.iterrows():
+        team_id = team['team_id']
+        score = all_scores.get(team_id, 0)
+        
+        leaderboard.append({
+            'rank': 0,  # Will be filled after sorting
+            'team_name': team['team_name'],
+            'league': team['league'],
+            'score': score
+        })
+    
+    # Sort by score and add ranks
+    leaderboard.sort(key=lambda x: x['score'], reverse=True)
+    for i, team in enumerate(leaderboard):
+        team['rank'] = i + 1
+    
+    # Display leaderboard
+    for team in leaderboard:
+        league_emoji = "🤎" if team['league'] == 'brown' else "🔴"
+        
+        col1, col2, col3 = st.columns([1, 3, 2])
+        
+        with col1:
+            rank_display = f"#{team['rank']}"
+            if team['rank'] <= 6:
+                rank_display += " ⭐"
+            st.write(rank_display)
+        
+        with col2:
+            st.write(f"{league_emoji} **{team['team_name']}**")
+        
+        with col3:
+            st.metric("", f"{team['score']:.1f}")
 
 def show_live_scores(all_teams, brown_api, red_api, sheets_manager, week, debug_mode):
     """Show live scores for both leagues"""
@@ -709,6 +873,14 @@ def show_season_standings(all_teams, sheets_manager):
         st.warning("No historical data available yet")
         return
     
+    # FIXED: Ensure 'league' column exists and handle data type issues
+    if 'league' not in weekly_scores_df.columns:
+        st.error("League column not found in weekly scores data")
+        return
+    
+    # Clean and standardize the league column
+    weekly_scores_df['league'] = weekly_scores_df['league'].astype(str).str.strip().str.lower()
+    
     col1, col2 = st.columns(2)
     
     with col1:
@@ -721,11 +893,18 @@ def show_season_standings(all_teams, sheets_manager):
 
 def display_league_standings(weekly_scores_df, all_teams, league):
     """Display standings for one league"""
+    # FIXED: Use cleaned league column and handle potential data type mismatches
     league_data = weekly_scores_df[weekly_scores_df['league'] == league]
     
     if league_data.empty:
         st.info(f"No {league} league data available yet")
         return
+    
+    # FIXED: Ensure numeric columns are properly converted
+    numeric_cols = ['total_weekly_points', 'weekly_losses', 'actual_score']
+    for col in numeric_cols:
+        if col in league_data.columns:
+            league_data[col] = pd.to_numeric(league_data[col], errors='coerce').fillna(0)
     
     standings = league_data.groupby('team_id').agg({
         'total_weekly_points': 'sum',
@@ -739,10 +918,19 @@ def display_league_standings(weekly_scores_df, all_teams, league):
         'actual_score': 'total_points'
     }, inplace=True)
     
+    # FIXED: Handle team_id matching more robustly
+    standings['team_id'] = standings['team_id'].astype(str)
+    all_teams_copy = all_teams.copy()
+    all_teams_copy['team_id'] = all_teams_copy['team_id'].astype(str)
+    
     standings = standings.merge(
-        all_teams[['team_id', 'team_name']], 
-        on='team_id'
+        all_teams_copy[['team_id', 'team_name']], 
+        on='team_id',
+        how='left'
     )
+    
+    # Fill missing team names
+    standings['team_name'] = standings['team_name'].fillna('Unknown Team')
     
     standings = standings.sort_values('wins', ascending=False).reset_index(drop=True)
     standings['rank'] = standings.index + 1
@@ -770,6 +958,20 @@ def show_records(all_teams, sheets_manager):
         st.warning("No historical data available yet")
         return
     
+    # FIXED: Ensure 'league' column exists and handle data type issues
+    if 'league' not in weekly_scores_df.columns:
+        st.error("League column not found in weekly scores data")
+        return
+    
+    # Clean and standardize the league column
+    weekly_scores_df['league'] = weekly_scores_df['league'].astype(str).str.strip().str.lower()
+    
+    # FIXED: Ensure numeric columns are properly converted
+    numeric_cols = ['intra_league_points', 'cross_league_points', 'top6_points', 'total_weekly_points', 'weekly_losses']
+    for col in numeric_cols:
+        if col in weekly_scores_df.columns:
+            weekly_scores_df[col] = pd.to_numeric(weekly_scores_df[col], errors='coerce').fillna(0)
+    
     # Calculate detailed records
     records = weekly_scores_df.groupby(['team_id', 'league']).agg({
         'intra_league_points': 'sum',
@@ -779,7 +981,19 @@ def show_records(all_teams, sheets_manager):
         'weekly_losses': 'sum'
     }).reset_index()
     
-    records = records.merge(all_teams[['team_id', 'team_name']], on='team_id')
+    # FIXED: Handle team_id matching more robustly
+    records['team_id'] = records['team_id'].astype(str)
+    all_teams_copy = all_teams.copy()
+    all_teams_copy['team_id'] = all_teams_copy['team_id'].astype(str)
+    
+    records = records.merge(
+        all_teams_copy[['team_id', 'team_name']], 
+        on='team_id',
+        how='left'
+    )
+    
+    # Fill missing team names
+    records['team_name'] = records['team_name'].fillna('Unknown Team')
     
     # Display combined table
     records['total_record'] = records['total_weekly_points'].astype(str) + '-' + records['weekly_losses'].astype(str)
