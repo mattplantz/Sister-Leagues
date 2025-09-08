@@ -169,9 +169,9 @@ class ESPNFantasyAPI:
         current_date = datetime.now()
         
         # Calculate when this week should be complete
-        # Assume Week 1 started September 5, 2024, then each week is 7 days later
+        # Assume Week 1 started September 4, 2025, then each week is 7 days later
         # Week completion happens on Tuesday morning (2 days after Sunday)
-        week_1_start = datetime(2024, 9, 5)  # Thursday Sept 5, 2024 (Week 1 start)
+        week_1_start = datetime(2025, 9, 4)  # Thursday Sept 4, 2025 (Week 1 start)
         week_start = week_1_start + timedelta(weeks=week-1)
         week_complete = week_start + timedelta(days=5)  # Tuesday after the week
         
@@ -179,7 +179,7 @@ class ESPNFantasyAPI:
     
     def get_current_week(self):
         """Calculate current NFL week"""
-        season_start = datetime(2024, 9, 5)  # Sept 5, 2024
+        season_start = datetime(2025, 9, 4)  # Sept 5, 2025
         current_date = datetime.now()
         days_since_start = (current_date - season_start).days
         current_week = min(max(1, (days_since_start // 7) + 1), 14)
