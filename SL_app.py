@@ -662,8 +662,8 @@ def show_weekly_rankings(all_teams, brown_api, red_api, week):
                 'score': score
             })
         else:
-            # Handle missing team info
-            league = 'red' if team_id > 100 else 'brown'
+            # Handle missing team info - extract league from unique team_id format
+            league = team_id.split('_')[0] if '_' in str(team_id) else 'unknown'
             all_scores.append({
                 'team_id': team_id,
                 'team_name': f'Team {team_id} (Not Found)',
