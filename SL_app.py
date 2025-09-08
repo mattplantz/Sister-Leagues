@@ -605,7 +605,7 @@ def display_all_teams_leaderboard(all_teams, all_scores):
             st.write(f"{league_emoji} **{team['team_name']}**")
         
         with col3:
-            st.metric("", f"{team['score']:.1f}")
+            st.metric("Score", f"{team['score']:.1f}")
 
 def show_season_standings(all_teams, sheets_manager):
     """Show season standings for both leagues"""
