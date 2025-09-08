@@ -465,7 +465,7 @@ def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
     # Stack sections vertically in specified order
     st.subheader("🔴 Red Line League Matchups")
     display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, 'red')
-    
+    st.subheader("🤎 Brown Line League Matchups")
     display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, 'brown')
     
     st.subheader("⚔️ Cross-League Matchups")
