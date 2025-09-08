@@ -134,9 +134,10 @@ class ESPNFantasyAPI:
                             st.write(f"    - {player['player']}: {player['points']} pts")
                     st.write("---")
             
-            # Calculate scores - for now let's be conservative with starting positions
-            # Common ESPN starting positions: 0-2 (QB, RB, WR), 4-6 (TE, K, DEF), 20-23 (FLEX)
-            starting_positions = [0, 1, 2, 3, 4, 5, 6, 16, 17, 20, 21, 22, 23]
+            # Calculate scores - using the correct starting lineup slots
+            # Starting positions: QB(0), TE(6), DL(11), DB(14), P(18), HC(19), FLEX(23)
+            # Excluding Slot 20 which is bench
+            starting_positions = [0, 6, 11, 14, 18, 19, 23]
             
             for team in data.get('teams', []):
                 team_id = team['id']
