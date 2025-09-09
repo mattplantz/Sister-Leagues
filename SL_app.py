@@ -134,7 +134,8 @@ class ESPNFantasyAPI:
         
         return pd.DataFrame(teams)
     
-    def get_live_scores(self, week):
+    
+def get_live_scores(self, week):
         """Get live scores by calculating from player stats"""
         try:
             data = self.make_request("mRoster", week)
@@ -157,16 +158,11 @@ class ESPNFantasyAPI:
                         applied_total = player_pool_entry.get('appliedStatTotal', 0)
                         total_score += applied_total
                 
-                # Store with raw ID first
-                team_scores[espn_team_id] = total_score
+                # Create prefixed ID that matches your Google Sheets format
+                prefixed_team_id = f"{self.league_type}_{espn_team_id}"
+                team_scores[prefixed_team_id] = total_score
             
-            # Convert all keys to prefixed strings
-            final_scores = {}
-            for raw_id, score in team_scores.items():
-                prefixed_key = f"{self.league_type}_{raw_id}"
-                final_scores[prefixed_key] = score
-            
-            return final_scores
+            return team_scores
         
         except Exception as e:
             st.error(f"Error getting live scores for {self.league_type}: {e}")
@@ -226,10 +222,6 @@ class ScoreCalculator:
         brown_scores = self.brown_api.get_live_scores(week)
         red_scores = self.red_api.get_live_scores(week)
         
-        # Get intra-league matchups (these should return prefixed IDs)
-        brown_matchups = self.brown_api.get_matchups(week)
-        red_matchups = self.red_api.get_matchups(week)
-        
         # Get cross-league matchups from Google Sheets
         cross_matchups = self.sheets_manager.get_worksheet_data("matchups")
         week_cross_matchups = cross_matchups[cross_matchups['week'] == week] if not cross_matchups.empty else pd.DataFrame()
@@ -251,14 +243,14 @@ class ScoreCalculator:
         
         # Process Brown League
         brown_data = self._process_league_scores(
-            brown_scores, brown_matchups, week_cross_matchups, 
+            brown_scores, None, week_cross_matchups, 
             'brown', week, week_complete, top6_teams
         )
         weekly_data.extend(brown_data)
         
         # Process Red League  
         red_data = self._process_league_scores(
-            red_scores, red_matchups, week_cross_matchups, 
+            red_scores, None, week_cross_matchups, 
             'red', week, week_complete, top6_teams
         )
         weekly_data.extend(red_data)
@@ -270,7 +262,11 @@ class ScoreCalculator:
     def _process_league_scores(self, scores, matchups, cross_matchups, league, week, week_complete, top6_teams):
         """Process scores for a single league"""
         league_data = []
-        week_matchups = matchups[matchups['week'] == week] if not matchups.empty else pd.DataFrame()
+        
+        # Get intra-league matchups from Google Sheets using manager names
+        sheet_name = f"{league}_league_matchups"
+        intra_matchups_df = self.sheets_manager.get_worksheet_data(sheet_name)
+        week_intra_matchups = intra_matchups_df[intra_matchups_df['week'] == week] if not intra_matchups_df.empty else pd.DataFrame()
         
         # Get cross-league opponent mapping
         cross_opponents = {}
@@ -303,16 +299,41 @@ class ScoreCalculator:
         
         # Process each team in this league
         for team_id, score in scores.items():
-            # Find intra-league opponent
+            # Find team info
+            team_info = self.all_teams_df[self.all_teams_df['team_id'] == team_id]
+            if team_info.empty:
+                continue
+                
+            team_name = team_info.iloc[0]['team_name']
+            
+            # Find intra-league opponent using manager names
             intra_opponent = None
             intra_opponent_score = 0
-            for _, matchup in week_matchups.iterrows():
-                if matchup['away_team_id'] == team_id:
-                    intra_opponent = matchup['home_team_id']
-                    intra_opponent_score = scores.get(intra_opponent, 0)
-                elif matchup['home_team_id'] == team_id:
-                    intra_opponent = matchup['away_team_id'] 
-                    intra_opponent_score = scores.get(intra_opponent, 0)
+            
+            for _, matchup in week_intra_matchups.iterrows():
+                team1_manager = matchup.get('team1_manager', '')
+                team2_manager = matchup.get('team2_manager', '')
+                
+                if team_name == team1_manager:
+                    # This team is team1, opponent is team2
+                    opponent_team = self.all_teams_df[
+                        (self.all_teams_df['team_name'] == team2_manager) & 
+                        (self.all_teams_df['league'] == league)
+                    ]
+                    if not opponent_team.empty:
+                        intra_opponent = opponent_team.iloc[0]['team_id']
+                        intra_opponent_score = scores.get(intra_opponent, 0)
+                    break
+                elif team_name == team2_manager:
+                    # This team is team2, opponent is team1
+                    opponent_team = self.all_teams_df[
+                        (self.all_teams_df['team_name'] == team1_manager) & 
+                        (self.all_teams_df['league'] == league)
+                    ]
+                    if not opponent_team.empty:
+                        intra_opponent = opponent_team.iloc[0]['team_id']
+                        intra_opponent_score = scores.get(intra_opponent, 0)
+                    break
             
             # Get cross-league opponent
             cross_opponent = cross_opponents.get(team_id)
@@ -485,7 +506,7 @@ def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, l
         st.info(f"No {league} line league matchups sheet found")
         return
     
-    # Filter for the specific week - FIXED: Use lowercase 'week'
+    # Filter for the specific week
     week_matchups = matchups_df[matchups_df['week'] == week] if 'week' in matchups_df.columns else pd.DataFrame()
     
     if week_matchups.empty:
@@ -495,7 +516,6 @@ def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, l
     for _, matchup in week_matchups.iterrows():
         team1_manager = matchup.get('team1_manager', '')
         team2_manager = matchup.get('team2_manager', '')
-        
         
         # Find teams by manager names
         team1 = all_teams[
@@ -517,13 +537,13 @@ def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, l
         team1_score = all_scores.get(team1_id, 0)
         team2_score = all_scores.get(team2_id, 0)
         
-        # Display matchup
+        # Display matchup with 2 decimal places
         with st.container():
             col_team1, col_vs, col_team2 = st.columns([2, 1, 2])
             
             with col_team1:
                 st.write(f"**{team1_manager}**")
-                st.metric("Score", f"{team1_score:.1f}")
+                st.metric("Score", f"{team1_score:.2f}")
             
             with col_vs:
                 st.write("")
@@ -531,7 +551,7 @@ def display_intra_league_matchups(sheets_manager, all_teams, all_scores, week, l
             
             with col_team2:
                 st.write(f"**{team2_manager}**")
-                st.metric("Score", f"{team2_score:.1f}")
+                st.metric("Score", f"{team2_score:.2f}")
             
             st.divider()
 
@@ -565,13 +585,13 @@ def display_cross_league_matchups(cross_matchups, all_teams, all_scores):
         brown_score = all_scores.get(brown_id, 0)
         red_score = all_scores.get(red_id, 0)
         
-        # Display matchup
+        # Display matchup with 2 decimal places
         with st.container():
             col_brown, col_vs, col_red = st.columns([2, 1, 2])
             
             with col_brown:
                 st.write(f"🤎 **{brown_manager}**")
-                st.metric("Score", f"{brown_score:.1f}")
+                st.metric("Score", f"{brown_score:.2f}")
             
             with col_vs:
                 st.write("")
@@ -579,10 +599,10 @@ def display_cross_league_matchups(cross_matchups, all_teams, all_scores):
             
             with col_red:
                 st.write(f"🔴 **{red_manager}**")
-                st.metric("Score", f"{red_score:.1f}")
+                st.metric("Score", f"{red_score:.2f}")
             
             st.divider()
-
+            
 def display_all_teams_leaderboard(all_teams, all_scores):
     """Display all 12 teams sorted by current week score"""
     # Create leaderboard data
@@ -604,7 +624,7 @@ def display_all_teams_leaderboard(all_teams, all_scores):
     for i, team in enumerate(leaderboard):
         team['rank'] = i + 1
     
-    # Display leaderboard
+    # Display leaderboard with 2 decimal places
     for team in leaderboard:
         league_emoji = "🤎" if team['league'] == 'brown' else "🔴"
         
@@ -620,8 +640,8 @@ def display_all_teams_leaderboard(all_teams, all_scores):
             st.write(f"{league_emoji} **{team['team_name']}**")
         
         with col3:
-            st.metric("Score", f"{team['score']:.1f}")
-
+            st.metric("Score", f"{team['score']:.2f}")
+            
 def show_season_standings(all_teams, sheets_manager):
     """Show season standings for both leagues"""
     st.header("Season Standings")
