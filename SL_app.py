@@ -168,7 +168,7 @@ def get_live_scores(self, week):
             st.error(f"Error getting live scores for {self.league_type}: {e}")
             return {}
     
-    def get_matchups(self, week=None):
+def get_matchups(self, week=None):
         """Get matchup structure"""
         data = self.make_request("mMatchup", week)
         
