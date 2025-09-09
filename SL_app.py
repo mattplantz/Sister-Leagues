@@ -134,8 +134,7 @@ class ESPNFantasyAPI:
         
         return pd.DataFrame(teams)
     
-    
-def get_live_scores(self, week):
+    def get_live_scores(self, week):
         """Get live scores by calculating from player stats"""
         try:
             data = self.make_request("mRoster", week)
@@ -168,7 +167,7 @@ def get_live_scores(self, week):
             st.error(f"Error getting live scores for {self.league_type}: {e}")
             return {}
     
-def get_matchups(self, week=None):
+    def get_matchups(self, week=None):
         """Get matchup structure"""
         data = self.make_request("mMatchup", week)
         
@@ -193,7 +192,7 @@ def get_matchups(self, week=None):
         
         return pd.DataFrame(matchups)
     
-def is_week_complete(self, week):
+    def is_week_complete(self, week):
         """Check if a week is complete (Tuesday morning after the week)"""
         current_date = datetime.now()
         week_1_start = datetime(2025, 9, 4)
@@ -201,7 +200,7 @@ def is_week_complete(self, week):
         week_complete = week_start + timedelta(days=5)
         return current_date >= week_complete
     
-def get_current_week(self):
+    def get_current_week(self):
         """Calculate current NFL week"""
         season_start = datetime(2025, 9, 4)
         current_date = datetime.now()
