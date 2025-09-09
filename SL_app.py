@@ -135,43 +135,16 @@ class ESPNFantasyAPI:
         return pd.DataFrame(teams)
     
     def get_live_scores(self, week):
-        """Get live scores by calculating from player stats for specific week"""
+        """Get live scores by calculating from player stats"""
         try:
-            # Use multiple views to get both roster and scoring data for the specific week
-            data = self.make_request("mMatchup&view=mScoreboard", week)
+            data = self.make_request("mRoster", week)
             
             team_scores = {}
-            
-            # Try to get scores from matchup data first (more reliable for historical weeks)
-            for matchup in data.get('schedule', []):
-                if matchup.get('matchupPeriodId') == week:
-                    # Away team
-                    if 'away' in matchup:
-                        away_team_id = matchup['away'].get('teamId')
-                        away_score = matchup['away'].get('totalPoints', 0)
-                        if away_team_id:
-                            prefixed_team_id = f"{self.league_type}_{away_team_id}"
-                            team_scores[prefixed_team_id] = away_score
-                    
-                    # Home team
-                    if 'home' in matchup:
-                        home_team_id = matchup['home'].get('teamId')
-                        home_score = matchup['home'].get('totalPoints', 0)
-                        if home_team_id:
-                            prefixed_team_id = f"{self.league_type}_{home_team_id}"
-                            team_scores[prefixed_team_id] = home_score
-            
-            # If we got scores from matchup data, return them
-            if team_scores:
-                return team_scores
-            
-            # Fallback: Try to calculate from roster data (for current week)
-            roster_data = self.make_request("mRoster", week)
             
             # Starting positions: QB(0), TE(6), DL(11), DB(14), P(18), HC(19), FLEX(23)
             starting_positions = [0, 6, 11, 14, 18, 19, 23]
             
-            for team in roster_data.get('teams', []):
+            for team in data.get('teams', []):
                 espn_team_id = team['id']  # Raw ESPN ID (1, 2, 3, etc.)
                 total_score = 0
                 
@@ -181,21 +154,7 @@ class ESPNFantasyAPI:
                     
                     if lineup_slot in starting_positions:
                         player_pool_entry = player_entry.get('playerPoolEntry', {})
-                        # Try to get week-specific stats
-                        player_stats = player_pool_entry.get('player', {}).get('stats', [])
-                        
-                        week_stats = None
-                        for stat_period in player_stats:
-                            if stat_period.get('scoringPeriodId') == week:
-                                week_stats = stat_period
-                                break
-                        
-                        if week_stats:
-                            applied_total = week_stats.get('appliedTotal', 0)
-                        else:
-                            # Fallback to appliedStatTotal if week-specific not available
-                            applied_total = player_pool_entry.get('appliedStatTotal', 0)
-                        
+                        applied_total = player_pool_entry.get('appliedStatTotal', 0)
                         total_score += applied_total
                 
                 # Create prefixed ID that matches your Google Sheets format
@@ -205,7 +164,7 @@ class ESPNFantasyAPI:
             return team_scores
         
         except Exception as e:
-            st.error(f"Error getting live scores for {self.league_type} week {week}: {e}")
+            st.error(f"Error getting live scores for {self.league_type}: {e}")
             return {}
     
     def get_matchups(self, week=None):
