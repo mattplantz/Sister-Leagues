@@ -473,10 +473,38 @@ def show_weekly_matchups(all_teams, brown_api, red_api, sheets_manager, week):
     """Show weekly matchups for all leagues"""
     st.header(f"Week {week} Matchups")
     
-    # Get current scores for display - ONE API call per league
-    brown_scores = brown_api.get_live_scores(week)
-    red_scores = red_api.get_live_scores(week)
-    all_scores = {**brown_scores, **red_scores}
+    # Check if week is complete
+    week_complete = brown_api.is_week_complete(week)
+    
+    # Get scores - use Google Sheets for completed weeks, ESPN API for current week
+    if week_complete:
+        # Use stored data from Google Sheets for completed weeks
+        weekly_scores_df = sheets_manager.get_worksheet_data("weekly_scores")
+        
+        if not weekly_scores_df.empty:
+            # Filter for the selected week
+            week_data = weekly_scores_df[weekly_scores_df['week'] == week]
+            
+            # Convert to the same format as API scores (team_id: score)
+            all_scores = {}
+            for _, row in week_data.iterrows():
+                team_id = row['team_id']
+                score = row['actual_score']
+                all_scores[team_id] = score
+                
+            st.info(f"Showing completed Week {week} results from stored data")
+        else:
+            # Fallback to API if no stored data
+            brown_scores = brown_api.get_live_scores(week)
+            red_scores = red_api.get_live_scores(week)
+            all_scores = {**brown_scores, **red_scores}
+            st.warning(f"Week {week} is complete but no stored data found. Using live API data.")
+    else:
+        # Use live API data for current/incomplete weeks
+        brown_scores = brown_api.get_live_scores(week)
+        red_scores = red_api.get_live_scores(week)
+        all_scores = {**brown_scores, **red_scores}
+        st.info(f"Showing live Week {week} scores")
     
     # Get cross-league matchups from sheets
     cross_matchups = sheets_manager.get_worksheet_data("matchups")
