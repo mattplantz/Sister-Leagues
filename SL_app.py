@@ -217,48 +217,53 @@ class ESPNFantasyAPI:
                 # This will be wrong but prevents the app from crashing
                 team_scores = current_totals
             
-            # Store current week cumulative totals for next week's calculation
-            try:
-                # Prepare data for storage
-                cumulative_data = []
-                for team_id, total in current_totals.items():
-                    cumulative_data.append({
-                        'week': week,
-                        'team_id': team_id,
-                        'cumulative_total': total,
-                        'league': self.league_type
-                    })
-                
-                # Update cumulative totals sheet
-                if cumulative_data:
-                    # Get existing data
-                    try:
-                        existing_data = cumulative_worksheet.get_all_records()
-                        existing_df = pd.DataFrame(existing_data) if existing_data else pd.DataFrame()
-                    except:
-                        existing_df = pd.DataFrame()
-                    
-                    new_df = pd.DataFrame(cumulative_data)
-                    
-                    # Remove existing records for this week/league and add new ones
-                    if not existing_df.empty:
-                        existing_df = existing_df[
-                            ~((existing_df['week'] == week) & 
-                              (existing_df['league'] == self.league_type))
-                        ]
-                        combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-                    else:
-                        combined_df = new_df
-                    
-                    # Update sheet
-                    cumulative_worksheet.clear()
-                    if not combined_df.empty:
-                        cumulative_worksheet.update([combined_df.columns.values.tolist()] + 
-                                                  combined_df.values.tolist())
+            # Check if week is complete before storing cumulative totals
+            week_complete = self.is_week_complete(week)
             
-            except Exception as storage_error:
-                # Storage failed, but don't crash the app
-                pass
+            # Store current week cumulative totals for next week's calculation
+            # ONLY store if this week is complete to avoid overwriting correct manual data
+            if week_complete:
+                try:
+                    # Prepare data for storage
+                    cumulative_data = []
+                    for team_id, total in current_totals.items():
+                        cumulative_data.append({
+                            'week': week,
+                            'team_id': team_id,
+                            'cumulative_total': total,
+                            'league': self.league_type
+                        })
+                    
+                    # Update cumulative totals sheet
+                    if cumulative_data:
+                        # Get existing data
+                        try:
+                            existing_data = cumulative_worksheet.get_all_records()
+                            existing_df = pd.DataFrame(existing_data) if existing_data else pd.DataFrame()
+                        except:
+                            existing_df = pd.DataFrame()
+                        
+                        new_df = pd.DataFrame(cumulative_data)
+                        
+                        # Remove existing records for this week/league and add new ones
+                        if not existing_df.empty:
+                            existing_df = existing_df[
+                                ~((existing_df['week'] == week) & 
+                                  (existing_df['league'] == self.league_type))
+                            ]
+                            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+                        else:
+                            combined_df = new_df
+                        
+                        # Update sheet
+                        cumulative_worksheet.clear()
+                        if not combined_df.empty:
+                            cumulative_worksheet.update([combined_df.columns.values.tolist()] + 
+                                                      combined_df.values.tolist())
+                
+                except Exception as storage_error:
+                    # Storage failed, but don't crash the app
+                    pass
             
             return team_scores
             
