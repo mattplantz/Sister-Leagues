@@ -505,7 +505,7 @@ def main():
     if st.sidebar.button("🔄 Refresh Data", type="primary"):
         refresh_data(sheets_manager, brown_api, red_api, selected_week)
     
-    # Page selector - UPDATED: Removed Live Scores and Weekly Rankings
+    # Page selector
     page = st.sidebar.selectbox(
         "Select View", 
         ["Weekly Matchups", "Season Standings", "Records"]
@@ -516,10 +516,7 @@ def main():
     
     if all_teams.empty:
         st.error("No team data found in Google Sheets. Please check the 'teams' tab.")
-        return
-    
-    if all_teams.empty:
-        st.error("Unable to load team data")
+        st.info("Click 'Refresh Data' to create initial team data from ESPN APIs.")
         return
     
     # Render selected page
