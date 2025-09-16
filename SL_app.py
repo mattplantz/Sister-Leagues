@@ -45,9 +45,41 @@ class GoogleSheetsManager:
     def update_worksheet(self, sheet_name, df):
         try:
             worksheet = self.spreadsheet.worksheet(sheet_name)
-            worksheet.clear()
-            if not df.empty:
+            
+            if df.empty:
+                return True
+            
+            # For weekly_scores sheet, we need to preserve existing data and only update specific weeks
+            if sheet_name == "weekly_scores":
+                # Get existing data BEFORE clearing
+                try:
+                    existing_data = worksheet.get_all_records()
+                    existing_df = pd.DataFrame(existing_data) if existing_data else pd.DataFrame()
+                except:
+                    existing_df = pd.DataFrame()
+                
+                if not existing_df.empty and 'week' in df.columns:
+                    # Get the weeks we're updating
+                    weeks_to_update = df['week'].unique()
+                    
+                    # Remove existing records for these weeks only
+                    existing_df = existing_df[~existing_df['week'].isin(weeks_to_update)]
+                    
+                    # Combine existing data with new data
+                    combined_df = pd.concat([existing_df, df], ignore_index=True)
+                else:
+                    # No existing data or no week column, use new data
+                    combined_df = df
+                
+                # Now clear and write the combined data
+                worksheet.clear()
+                worksheet.update([combined_df.columns.values.tolist()] + combined_df.values.tolist())
+            
+            else:
+                # For other sheets, use the original behavior (full overwrite)
+                worksheet.clear()
                 worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+            
             return True
         except Exception as e:
             st.error(f"Error updating {sheet_name}: {e}")
