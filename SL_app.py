@@ -135,7 +135,7 @@ class ESPNFantasyAPI:
         return pd.DataFrame(teams)
     
     def get_live_scores(self, week):
-        """Get live scores by calculating from player stats"""
+        """Get live scores by calculating weekly differentials from cumulative totals"""
         try:
             data = self.make_request("mRoster", week)
             
@@ -144,8 +144,10 @@ class ESPNFantasyAPI:
             # Starting positions: QB(0), TE(6), DL(11), DB(14), P(18), HC(19), FLEX(23)
             starting_positions = [0, 6, 11, 14, 18, 19, 23]
             
+            # Get current week cumulative totals
+            current_totals = {}
             for team in data.get('teams', []):
-                espn_team_id = team['id']  # Raw ESPN ID (1, 2, 3, etc.)
+                espn_team_id = team['id']
                 total_score = 0
                 
                 roster = team.get('roster', {}).get('entries', [])
@@ -157,12 +159,109 @@ class ESPNFantasyAPI:
                         applied_total = player_pool_entry.get('appliedStatTotal', 0)
                         total_score += applied_total
                 
-                # Create prefixed ID that matches your Google Sheets format
                 prefixed_team_id = f"{self.league_type}_{espn_team_id}"
-                team_scores[prefixed_team_id] = total_score
+                current_totals[prefixed_team_id] = total_score
+            
+            # For week 1, current totals are the weekly scores
+            if week == 1:
+                return current_totals
+            
+            # For week 2+, get previous week cumulative totals and calculate difference
+            try:
+                # Import here to avoid circular dependency
+                from google.oauth2.service_account import Credentials
+                import gspread
+                import streamlit as st
+                
+                # Set up Google Sheets connection (reusing the same logic as GoogleSheetsManager)
+                scope = [
+                    'https://www.googleapis.com/auth/spreadsheets',
+                    'https://www.googleapis.com/auth/drive'
+                ]
+                
+                creds_dict = {
+                    "type": st.secrets["google"]["type"],
+                    "project_id": st.secrets["google"]["project_id"],
+                    "private_key_id": st.secrets["google"]["private_key_id"],
+                    "private_key": st.secrets["google"]["private_key"],
+                    "client_email": st.secrets["google"]["client_email"],
+                    "client_id": st.secrets["google"]["client_id"],
+                    "auth_uri": st.secrets["google"]["auth_uri"],
+                    "token_uri": st.secrets["google"]["token_uri"],
+                }
+                
+                credentials = Credentials.from_service_account_info(creds_dict, scopes=scope)
+                gc = gspread.authorize(credentials)
+                spreadsheet = gc.open_by_key(st.secrets["google"]["sheet_id"])
+                
+                # Try to get stored cumulative totals from previous week
+                cumulative_worksheet = spreadsheet.worksheet("cumulative_totals")
+                stored_data = cumulative_worksheet.get_all_records()
+                
+                # Find previous week totals for this league
+                previous_totals = {}
+                for record in stored_data:
+                    if (record.get('week') == week - 1 and 
+                        str(record.get('team_id', '')).startswith(self.league_type)):
+                        team_id = record['team_id']
+                        cumulative_total = float(record.get('cumulative_total', 0))
+                        previous_totals[team_id] = cumulative_total
+                
+                # Calculate weekly scores as difference
+                for team_id, current_total in current_totals.items():
+                    previous_total = previous_totals.get(team_id, 0)
+                    team_scores[team_id] = current_total - previous_total
+            
+            except Exception as sheets_error:
+                # If we can't access stored data, fall back to current totals
+                # This will be wrong but prevents the app from crashing
+                team_scores = current_totals
+            
+            # Store current week cumulative totals for next week's calculation
+            try:
+                # Prepare data for storage
+                cumulative_data = []
+                for team_id, total in current_totals.items():
+                    cumulative_data.append({
+                        'week': week,
+                        'team_id': team_id,
+                        'cumulative_total': total,
+                        'league': self.league_type
+                    })
+                
+                # Update cumulative totals sheet
+                if cumulative_data:
+                    # Get existing data
+                    try:
+                        existing_data = cumulative_worksheet.get_all_records()
+                        existing_df = pd.DataFrame(existing_data) if existing_data else pd.DataFrame()
+                    except:
+                        existing_df = pd.DataFrame()
+                    
+                    new_df = pd.DataFrame(cumulative_data)
+                    
+                    # Remove existing records for this week/league and add new ones
+                    if not existing_df.empty:
+                        existing_df = existing_df[
+                            ~((existing_df['week'] == week) & 
+                              (existing_df['league'] == self.league_type))
+                        ]
+                        combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+                    else:
+                        combined_df = new_df
+                    
+                    # Update sheet
+                    cumulative_worksheet.clear()
+                    if not combined_df.empty:
+                        cumulative_worksheet.update([combined_df.columns.values.tolist()] + 
+                                                  combined_df.values.tolist())
+            
+            except Exception as storage_error:
+                # Storage failed, but don't crash the app
+                pass
             
             return team_scores
-        
+            
         except Exception as e:
             st.error(f"Error getting live scores for {self.league_type}: {e}")
             return {}
