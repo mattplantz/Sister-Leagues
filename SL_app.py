@@ -695,7 +695,7 @@ def display_league_standings(weekly_scores_df, all_teams, league):
     )
     
     standings['team_name'] = standings['team_name'].fillna('Unknown Team')
-    standings = standings.sort_values('wins', ascending=False).reset_index(drop=True)
+    standings = standings.sort_values(['wins', 'total_points'], ascending=[False, False]).reset_index(drop=True)
     standings['rank'] = standings.index + 1
     standings['record'] = standings['wins'].astype(str) + '-' + standings['losses'].astype(str)
     
@@ -788,7 +788,17 @@ def show_records(all_teams, sheets_manager):
         display_columns.append('top6_points')
         column_config["top6_points"] = "Top 6 Wins"
     
-    records = records.sort_values('total_weekly_points', ascending=False) if 'total_weekly_points' in records.columns else records
+    if 'total_weekly_points' in records.columns:
+        # Add total_points column for tiebreaking
+        if 'actual_score' in weekly_scores_df.columns:
+            total_points = weekly_scores_df.groupby('team_id')['actual_score'].sum().reset_index()
+            total_points.rename(columns={'actual_score': 'total_points'}, inplace=True)
+            total_points['team_id'] = total_points['team_id'].astype(str)
+            records = records.merge(total_points, on='team_id', how='left')
+            records['total_points'] = records['total_points'].fillna(0)
+            records = records.sort_values(['total_weekly_points', 'total_points'], ascending=[False, False])
+        else:
+            records = records.sort_values('total_weekly_points', ascending=False)
     
     st.dataframe(
         records[display_columns],
