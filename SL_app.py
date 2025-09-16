@@ -217,12 +217,9 @@ class ESPNFantasyAPI:
                 # This will be wrong but prevents the app from crashing
                 team_scores = current_totals
             
-            # Check if week is complete before storing cumulative totals
-            week_complete = self.is_week_complete(week)
-            
             # Store current week cumulative totals for next week's calculation
-            # ONLY store if this week is complete to avoid overwriting correct manual data
-            if week_complete:
+            # NEVER overwrite weeks 1 and 2 - they have manually corrected data
+            if week >= 3:
                 try:
                     # Prepare data for storage
                     cumulative_data = []
